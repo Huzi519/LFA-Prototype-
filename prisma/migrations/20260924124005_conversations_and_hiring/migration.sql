@@ -66,9 +66,37 @@ CREATE TABLE "Credential" (
 );
 
 -- CreateTable
+CREATE TABLE "Conversation" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "companyId" TEXT NOT NULL,
+    "workerId" TEXT NOT NULL,
+    "jobId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Conversation_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "CompanyProfile" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Conversation_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "WorkerProfile" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Conversation_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "Job" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Message" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "conversationId" TEXT NOT NULL,
+    "senderId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL DEFAULT 'TEXT',
+    "body" TEXT NOT NULL,
+    "proposalTitle" TEXT,
+    "proposalDescription" TEXT,
+    "proposalBudget" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Message_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Message_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "Job" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "companyId" TEXT NOT NULL,
+    "workerId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "trade" TEXT NOT NULL,
@@ -76,31 +104,17 @@ CREATE TABLE "Job" (
     "postcode" TEXT NOT NULL,
     "startDate" DATETIME NOT NULL,
     "budget" INTEGER NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'OPEN',
-    "hiredWorkerId" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'HIRED',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Job_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "CompanyProfile" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Job_hiredWorkerId_fkey" FOREIGN KEY ("hiredWorkerId") REFERENCES "WorkerProfile" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "Quote" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "jobId" TEXT NOT NULL,
-    "workerId" TEXT NOT NULL,
-    "amount" INTEGER NOT NULL,
-    "message" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'SUBMITTED',
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Quote_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "Job" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "Quote_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "WorkerProfile" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "Job_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "WorkerProfile" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "Document" (
     "id" TEXT NOT NULL PRIMARY KEY,
-    "jobId" TEXT NOT NULL,
+    "conversationId" TEXT NOT NULL,
     "uploaderId" TEXT NOT NULL,
     "recipientId" TEXT NOT NULL,
     "category" TEXT NOT NULL,
@@ -108,7 +122,7 @@ CREATE TABLE "Document" (
     "status" TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
     "reviewNote" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Document_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "Job" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Document_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "Document_uploaderId_fkey" FOREIGN KEY ("uploaderId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Document_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT "Document_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "File" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -188,25 +202,31 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 CREATE UNIQUE INDEX "WorkerProfile_userId_key" ON "WorkerProfile"("userId");
 
 -- CreateIndex
+CREATE INDEX "WorkerProfile_profileStatus_primaryTrade_idx" ON "WorkerProfile"("profileStatus", "primaryTrade");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CompanyProfile_userId_key" ON "CompanyProfile"("userId");
 
 -- CreateIndex
 CREATE INDEX "Credential_workerId_idx" ON "Credential"("workerId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Conversation_jobId_key" ON "Conversation"("jobId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Conversation_companyId_workerId_key" ON "Conversation"("companyId", "workerId");
+
+-- CreateIndex
+CREATE INDEX "Message_conversationId_createdAt_idx" ON "Message"("conversationId", "createdAt");
+
+-- CreateIndex
 CREATE INDEX "Job_companyId_idx" ON "Job"("companyId");
 
 -- CreateIndex
-CREATE INDEX "Job_trade_state_idx" ON "Job"("trade", "state");
+CREATE INDEX "Job_workerId_idx" ON "Job"("workerId");
 
 -- CreateIndex
-CREATE INDEX "Quote_jobId_idx" ON "Quote"("jobId");
-
--- CreateIndex
-CREATE INDEX "Quote_workerId_idx" ON "Quote"("workerId");
-
--- CreateIndex
-CREATE INDEX "Document_jobId_idx" ON "Document"("jobId");
+CREATE INDEX "Document_conversationId_idx" ON "Document"("conversationId");
 
 -- CreateIndex
 CREATE INDEX "Document_recipientId_idx" ON "Document"("recipientId");

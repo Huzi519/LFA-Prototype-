@@ -12,12 +12,20 @@ export default async function AdminDocumentsPage() {
   const [pending, recentlyReviewed] = await Promise.all([
     db.document.findMany({
       where: { status: "PENDING_REVIEW" },
-      include: { file: true, uploader: true, job: { include: { company: true } } },
+      include: {
+        file: true,
+        uploader: true,
+        conversation: { include: { company: true, worker: true } },
+      },
       orderBy: { createdAt: "asc" },
     }),
     db.document.findMany({
       where: { status: { in: ["APPROVED", "REJECTED"] } },
-      include: { file: true, uploader: true, job: { include: { company: true } } },
+      include: {
+        file: true,
+        uploader: true,
+        conversation: { include: { company: true, worker: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 10,
     }),
@@ -45,11 +53,13 @@ export default async function AdminDocumentsPage() {
                 <CardContent className="flex items-start justify-between gap-4 pt-6 text-sm">
                   <div className="space-y-1">
                     <p className="font-medium">
-                      {doc.category.replace(/_/g, " ")} — {doc.job.title}
+                      {doc.category.replace(/_/g, " ")} —{" "}
+                      {doc.conversation.company.companyName} ↔{" "}
+                      {doc.conversation.worker.fullName}
                     </p>
                     <p className="text-muted-foreground">
-                      From {doc.uploader.email} ({doc.job.company.companyName}
-                      ) · {doc.file.originalName} · {formatDate(doc.createdAt)}
+                      From {doc.uploader.email} · {doc.file.originalName} ·{" "}
+                      {formatDate(doc.createdAt)}
                     </p>
                     <a
                       href={`/api/files/${doc.file.id}`}
@@ -78,8 +88,9 @@ export default async function AdminDocumentsPage() {
               <Card key={doc.id}>
                 <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
                   <span>
-                    {doc.category.replace(/_/g, " ")} — {doc.job.title} · From{" "}
-                    {doc.uploader.email}
+                    {doc.category.replace(/_/g, " ")} —{" "}
+                    {doc.conversation.company.companyName} ↔{" "}
+                    {doc.conversation.worker.fullName} · From {doc.uploader.email}
                   </span>
                   <Badge variant={doc.status === "APPROVED" ? "default" : "destructive"}>
                     {doc.status}

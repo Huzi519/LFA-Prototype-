@@ -17,12 +17,12 @@ const CATEGORIES = [
   "OTHER",
 ] as const;
 
-export function DocumentUploadForm({ jobId }: { jobId: string }) {
+export function DocumentUploadForm({ conversationId }: { conversationId: string }) {
   const [state, formAction, pending] = useActionState(uploadDocument, undefined);
 
   return (
     <form action={formAction} className="space-y-3 rounded-md border p-4">
-      <input type="hidden" name="jobId" value={jobId} />
+      <input type="hidden" name="conversationId" value={conversationId} />
       {state?.error && (
         <Alert variant="destructive">
           <AlertDescription>{state.error}</AlertDescription>

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2 } from "lucide-react";
+import { isValidAbn } from "@/lib/rules/abn";
 
 const TRADES = ["PLUMBER", "ELECTRICIAN", "CARPENTER", "LABOURER"] as const;
 const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
@@ -96,8 +97,7 @@ export function OnboardingWizard({
     if (step === 0) {
       if (!form.fullName.trim()) return "Enter your full name.";
       if (!form.phone.trim()) return "Enter a phone number.";
-      if (!/^\d{11}$/.test(form.abn.replace(/\D/g, "")))
-        return "Enter an 11-digit ABN.";
+      if (!isValidAbn(form.abn)) return "Enter a valid 11-digit ABN.";
     }
     if (step === 1) {
       if (!form.primaryTrade) return "Select your primary trade.";

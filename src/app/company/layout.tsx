@@ -18,8 +18,9 @@ export default async function CompanyLayout({
         userId={user.id}
         links={[
           { href: "/company/dashboard", label: "Dashboard" },
+          { href: "/company/workers", label: "Search workers" },
+          { href: "/company/messages", label: "Messages" },
           { href: "/company/jobs", label: "My jobs" },
-          { href: "/company/jobs/new", label: "Post a job" },
         ]}
       />
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>

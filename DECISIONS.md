@@ -88,3 +88,129 @@ unclear.
 - **Notification bell** lives in `RoleNav` (now an async server component)
   across all three role layouts, with mark-one-read and mark-all-read
   Server Actions in `src/lib/actions/notifications.ts`.
+
+## Pivot: direct search-and-hire + chat, plus a public site (2026-09-24)
+
+The user asked for a fundamental change to the hiring model: instead of a
+job board (company posts a job, workers browse and quote), companies now
+**search and browse** worker profiles, **message a specific worker
+directly**, negotiate through in-platform chat (including a structured
+**proposal** and document exchange), and take an explicit **"Mark as
+hired"** action. A **public site** (no login) was also added so visitors
+can browse the worker directory and view full profiles.
+
+Confirmed with the user before implementing:
+- The old job-posting/quote flow is **removed entirely**, not kept as a
+  second option — `Quote` model, `/company/jobs/new`, the open-jobs feed at
+  `/worker/jobs`, and the accept-quote action are all gone.
+- Public profiles show everything except phone/email.
+- Chat is implemented as **~3s client-side polling** against a small
+  `GET /api/conversations/[id]/messages` route, not websockets/SSE — the
+  "real-time" feel the user asked for, without adding a new architectural
+  dependency to a codebase that otherwise relies entirely on Server Actions
+  and page-level revalidation.
+- Hiring happens via an explicit "Mark as hired" dialog, not automatically
+  when a proposal is sent.
+
+Design decisions made while implementing:
+- **Documents attach to `Conversation`, not `Job`.** The client's described
+  sequence is chat → proposal → document exchange → hire, meaning
+  documents need to flow before a Job exists. Rather than adding a second,
+  unreviewed attachment channel for "chat documents" (which would undercut
+  the platform's core differentiator — every document passes admin review),
+  `Document.jobId` became `Document.conversationId`. A `Conversation`
+  exists from first contact onward, so the same admin-reviewed flow
+  (`src/lib/actions/documents.ts`, `ConversationDocuments`,
+  `/admin/documents`) now applies throughout the whole relationship, not
+  just post-hire. This also simplified the code: the old
+  `job.hiredWorkerId &&` gate is gone entirely.
+- **One `Conversation` per company/worker pair** (`@@unique([companyId,
+  workerId])`), reused across contact → negotiation → hire. `Job` is now a
+  status record with a required `workerId` (it never exists without one)
+  and an optional back-link from its `Conversation`.
+- **`canWorkerTakeJob` is now a hard block inside `markAsHired`**,
+  preserving the eligibility rule that used to gate quoting — a company
+  cannot hire a worker for a trade/state licence combination they're not
+  approved for, and the reason is shown in the UI.
+- **`src/proxy.ts` bug fixed during planning**: the role-prefix guard used
+  `pathname.startsWith(r.prefix)`, which would have caught the new public
+  `/workers` directory under the `/worker` prefix check and redirected
+  anonymous visitors to `/login`. Changed to a path-segment-bound check
+  (`pathname === prefix || pathname.startsWith(prefix + "/")`).
+- **Bug found and fixed via live testing, not by inspection**: the "Mark as
+  hired" dialog originally read its prefill values from a prop computed by
+  the server-rendered page at initial load. Since the chat updates live via
+  polling but the page itself never reloads, that prop went stale the
+  moment a second proposal was sent in the same session — the dialog would
+  silently prefill from an old proposal. Fixed by moving the proposal/hire
+  controls into `ChatThread` itself, so they read the *live* polled
+  `messages` state instead of a static server prop (Server → Client props
+  can't carry functions, so this was the only way to keep the hire dialog
+  in sync with the chat).
+- **`JobStatus`** dropped `OPEN` (no more public job postings) and
+  `PROOF_SUBMITTED` (was escrow-proof specific, already unreachable before
+  this pivot); default status is now `HIRED`.
+
+Verified live (not just typechecked) with a full multi-context browser
+run: anonymous visitor browses the public directory and a profile with
+contact info correctly hidden; `/worker/dashboard` still redirects to
+login (confirms the proxy fix didn't loosen real protection); a company
+searches, opens a profile, messages, sends a proposal; the worker replies
+and the company sees it appear via polling with no page reload; the
+company marks the worker as hired with the *live* latest proposal (not a
+stale one); a document is exchanged and goes through admin review; the
+resulting job appears on both dashboards.
+
+## Simplified demo data + landing page redesign (2026-09-24, later same day)
+
+The user asked to simplify the demo: one landing page redesigned as a
+simple set of info boxes, at least 20 dummy worker profiles for the
+directory (no dashboards needed for them), only **one** worker account
+meant to be a working dashboard, one company (not two), and that company
+having exactly 2 jobs `IN_PROGRESS` and 1 `DISPUTED` with that one worker —
+the same 3 jobs visible on both the company's and the worker's dashboards.
+
+- **Dropped the 4 credential-edge-case worker accounts** (pending review,
+  expired/hidden, rejected licence, NSW-only electrician) and the second
+  company (`facilities@demo.test`) from seed data, per "only one dashboard
+  for the labour" and "one company profile." The business rules they used
+  to demonstrate (expiry, rejection, state-based licensing) are still
+  fully unit-tested in `src/lib/rules/credentials.test.ts` — only the seed
+  demonstration of them was removed, not the rules themselves. Easy to add
+  a couple back later if the client wants to demo those cases again.
+- **Added 20 plain `LIVE` dummy worker profiles** across all four trades
+  and all eight states/territories, for directory search realism. No
+  credentials, no distinguishing edge cases, no featured demo-login button
+  — they exist purely to populate the browsable directory.
+- **Schema change: `Conversation` is no longer unique per company/worker
+  pair.** The requested scenario — one company, one worker, three separate
+  jobs between them — is impossible under the old `@@unique([companyId,
+  workerId])` constraint, which assumed a company only ever has one
+  relationship (and therefore at most one hire) with a given worker.
+  Relaxed to an index instead of a unique constraint; `getOrCreateConversation`
+  now reuses the pair's still-open thread (`jobId` null) if one exists,
+  otherwise starts a fresh conversation — so re-hiring the same worker
+  later opens a new negotiation rather than reopening an already-hired one.
+  New migration: `20260924132810_repeat_conversations`.
+- **Landing page** rewritten as a simple hero plus four static info boxes
+  (search & discover, message directly, admin-reviewed documents, hire
+  with confidence) — deliberately plain per "very simple, just boxes and
+  simple information," no new dependencies or design system.
+- **Bug found and fixed via live testing**: both dialog triggers (`Send a
+  proposal`, `Mark as hired`) were passing `nativeButton={false}` to the
+  `Button` they used as `DialogTrigger`'s `render` target. That prop is
+  only correct when `Button` itself wraps a further non-button element
+  (like the `<Link>` cases elsewhere in the codebase) — here `Button` was
+  the final rendered element, so it needs to stay a real `<button>`
+  (`nativeButton`'s default). The wrong value produced a Base UI console
+  error on every render of those dialogs, though the dialogs still
+  functioned. Fixed both call sites.
+
+Verified live: reseeded database confirmed with a real browser run — the
+public directory shows all 21 live workers (20 dummy + Jack Thompson); the
+company's and worker's job lists both show exactly 2 `IN_PROGRESS` + 1
+`DISPUTED`, matching the DB directly. Full check suite green
+(typecheck/lint/42 unit tests) and the Playwright e2e test passes against
+the new seed shape (relabelled demo-login buttons, and a document-count
+assertion that assumed old seed content was corrected to match the new,
+simpler data).

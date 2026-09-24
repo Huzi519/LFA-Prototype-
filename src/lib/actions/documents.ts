@@ -8,10 +8,12 @@ import { saveUpload, InvalidFileError } from "@/lib/storage";
 import { notify } from "@/lib/notifications";
 import { Role, DocumentStatus } from "@/generated/prisma";
 
-// Shared by both worker and company job pages — documents are always tied
-// to a job and exchanged with that job's other party (CLAUDE.md "Every
-// uploaded document starts as PENDING_REVIEW and is invisible to the
-// recipient until an admin approves it").
+// Shared by company and worker conversation pages — documents attach to a
+// Conversation (the hub for a company/worker relationship — see
+// DECISIONS.md), not a Job, so the admin-review gate applies from first
+// contact onward, not only after a hire. CLAUDE.md "Every uploaded
+// document starts as PENDING_REVIEW and is invisible to the recipient
+// until an admin approves it" still holds throughout.
 
 export type ActionState = { error?: string } | undefined;
 
@@ -26,7 +28,7 @@ const CATEGORIES = [
 ] as const;
 
 const uploadSchema = z.object({
-  jobId: z.string().min(1),
+  conversationId: z.string().min(1),
   category: z.enum(CATEGORIES),
 });
 
@@ -40,32 +42,25 @@ export async function uploadDocument(
   }
 
   const parsed = uploadSchema.safeParse({
-    jobId: formData.get("jobId"),
+    conversationId: formData.get("conversationId"),
     category: formData.get("category"),
   });
   if (!parsed.success) return { error: "Invalid input." };
 
-  const job = await db.job.findUnique({
-    where: { id: parsed.data.jobId },
-    include: { company: true, hiredWorker: true },
+  const conversation = await db.conversation.findUnique({
+    where: { id: parsed.data.conversationId },
+    include: { company: true, worker: true },
   });
-  if (!job || !job.hiredWorker) {
-    return { error: "This job has no hired worker to share documents with." };
-  }
+  if (!conversation) return { error: "Conversation not found." };
 
-  // Ownership check — the actor must actually be a party to this job.
+  // Ownership check — the actor must actually be a party to this thread.
   let recipientId: string;
-  if (user.role === Role.COMPANY) {
-    if (job.company.userId !== user.id) return { error: "Not your job." };
-    recipientId = job.hiredWorker.userId;
+  if (conversation.company.userId === user.id) {
+    recipientId = conversation.worker.userId;
+  } else if (conversation.worker.userId === user.id) {
+    recipientId = conversation.company.userId;
   } else {
-    const workerProfile = await db.workerProfile.findUnique({
-      where: { userId: user.id },
-    });
-    if (!workerProfile || job.hiredWorkerId !== workerProfile.id) {
-      return { error: "You're not the hired worker on this job." };
-    }
-    recipientId = job.company.userId;
+    return { error: "Not your conversation." };
   }
 
   const file = formData.get("file");
@@ -89,7 +84,7 @@ export async function uploadDocument(
 
     await db.document.create({
       data: {
-        jobId: job.id,
+        conversationId: conversation.id,
         uploaderId: user.id,
         recipientId,
         category: parsed.data.category,
@@ -102,8 +97,8 @@ export async function uploadDocument(
     return { error: "Upload failed. Please try again." };
   }
 
-  revalidatePath(`/worker/jobs/${job.id}`);
-  revalidatePath(`/company/jobs/${job.id}`);
+  revalidatePath(`/worker/messages/${conversation.id}`);
+  revalidatePath(`/company/messages/${conversation.id}`);
   revalidatePath("/worker/documents");
   return { error: undefined };
 }
@@ -136,7 +131,7 @@ export async function reviewDocument(
 
   const document = await db.document.findUnique({
     where: { id: parsed.data.documentId },
-    include: { job: { include: { company: true } } },
+    include: { conversation: { include: { company: true } } },
   });
   if (!document) return { error: "Document not found." };
   if (document.status !== DocumentStatus.PENDING_REVIEW) {
@@ -153,15 +148,15 @@ export async function reviewDocument(
     data: { status: newStatus, reviewNote: parsed.data.reviewNote || null },
   });
 
-  const uploaderIsCompany = document.uploaderId === document.job.company.userId;
+  const uploaderIsCompany = document.uploaderId === document.conversation.company.userId;
   await notify(
     document.uploaderId,
     newStatus === DocumentStatus.APPROVED
-      ? `Your document for "${document.job.title}" was approved and is now visible to the recipient.`
-      : `Your document for "${document.job.title}" was rejected: ${parsed.data.reviewNote}`,
+      ? "Your document was approved and is now visible to the other party."
+      : `Your document was rejected: ${parsed.data.reviewNote}`,
     uploaderIsCompany
-      ? `/company/jobs/${document.jobId}`
-      : `/worker/jobs/${document.jobId}`
+      ? `/company/messages/${document.conversationId}`
+      : `/worker/messages/${document.conversationId}`
   );
 
   revalidatePath("/admin/documents");

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { registerWorker, registerCompany } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"];
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") === "company" ? "company" : "worker";
+
   const [workerState, workerAction, workerPending] = useActionState(
     registerWorker,
     undefined
@@ -38,7 +50,7 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="worker">
+          <Tabs defaultValue={defaultTab}>
             <TabsList className="w-full">
               <TabsTrigger value="worker" className="flex-1">
                 Tradesperson

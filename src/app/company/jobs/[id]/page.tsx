@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -5,8 +6,6 @@ import { Role } from "@/generated/prisma";
 import { formatCents, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AcceptQuoteButton } from "./accept-quote-button";
-import { JobDocuments } from "@/components/job-documents";
 
 export default async function CompanyJobDetailPage({
   params,
@@ -21,14 +20,8 @@ export default async function CompanyJobDetailPage({
 
   const job = await db.job.findUnique({
     where: { id },
-    include: {
-      quotes: {
-        include: { worker: true },
-        orderBy: { createdAt: "asc" },
-      },
-    },
+    include: { worker: true, conversation: true },
   });
-
   if (!job || job.companyId !== company.id) notFound();
 
   return (
@@ -49,44 +42,27 @@ export default async function CompanyJobDetailPage({
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">
-          Quotes ({job.quotes.length})
-        </h2>
-        {job.quotes.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No quotes yet — eligible workers will see this job in their feed.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {job.quotes.map((quote) => (
-              <Card key={quote.id}>
-                <CardContent className="flex items-start justify-between gap-4 pt-6">
-                  <div className="space-y-1">
-                    <p className="font-medium">{quote.worker.fullName}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {quote.worker.primaryTrade} · {quote.worker.homeState} ·{" "}
-                      {quote.worker.yearsExperience} yrs experience
-                    </p>
-                    <p className="text-sm">{quote.message}</p>
-                    <p className="font-medium">{formatCents(quote.amount)}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <Badge variant="outline">{quote.status}</Badge>
-                    {job.status === "OPEN" && quote.status === "SUBMITTED" && (
-                      <AcceptQuoteButton jobId={job.id} quoteId={quote.id} />
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Hired worker</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between text-sm">
+          <div>
+            <p className="font-medium">{job.worker.fullName}</p>
+            <p className="text-muted-foreground">
+              {job.worker.primaryTrade} · {job.worker.homeState}
+            </p>
           </div>
-        )}
-      </div>
-
-      {job.hiredWorkerId && (
-        <JobDocuments jobId={job.id} viewerUserId={user.id} canUpload />
-      )}
+          {job.conversation && (
+            <Link
+              href={`/company/messages/${job.conversation.id}`}
+              className="text-sm underline underline-offset-4"
+            >
+              View conversation & documents
+            </Link>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

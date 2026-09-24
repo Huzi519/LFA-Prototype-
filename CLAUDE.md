@@ -4,34 +4,36 @@ This file guides Claude Code when working in this repository. Read it fully befo
 
 ## Project Overview
 
-LFA (Labour Workforce Australia) is a marketplace for Australia where skilled tradespeople (plumbers, electricians, carpenters, etc.) create verified profiles and companies hire them for jobs. Three things make it different from a generic job board:
+LFA (Labour Workforce Australia) is a marketplace for Australia where skilled tradespeople (plumbers, electricians, carpenters, etc.) create verified profiles and companies find and hire them directly. Three things make it different from a generic job board:
 
 1. **Strict, structured worker profiles** with credentials (licences, White Card, insurance) that an admin verifies before they count.
-2. **Admin-reviewed document sharing**: documents sent between companies and workers pass through an admin review before the recipient can see them.
-3. **Escrow payments**: the company funds the job upfront, and money is released to the worker only after proof of completion is approved.
+2. **Admin-reviewed document sharing**: every document sent between a company and a worker — from first contact through to an active job — passes through an admin review before the other party can see it.
+3. **Direct search and hire, not a job board**: companies search and browse worker profiles (including a public directory, no login required), contact a specific worker, negotiate through in-platform chat, and explicitly mark them as hired. There is no public job-posting/quoting flow.
 
 This is a **prototype**. The goal is a working, clickable demo of the core flows, not a production system. Prefer simple, readable code over abstraction. Requirements are still being confirmed with the client, so keep business rules in one place (`src/lib/rules/`) where they are easy to change.
+
+Note: escrow/payments, admin credential verification, and disputes are built into the data model as reference code but are **not wired into the app** — this was a deliberate scope cut. See `DECISIONS.md` for the full history, including the later pivot from a job-board model to direct search-and-hire with chat.
 
 ## Prototype Scope
 
 ### In scope
 - Email/password auth with three roles: `WORKER`, `COMPANY`, `ADMIN`
 - Worker onboarding wizard with required profile fields
-- Credential upload and admin verification queue
-- Company job posting, worker quotes, and hiring
-- Document sharing with an admin review gate
-- Simulated escrow (fund → hold → proof → approve → release)
-- Basic dispute flag that freezes escrow and sends the job to admin
-- Admin dashboard: verification queue, document queue, disputes, escrow overview
+- A public worker directory (search/browse, full profile minus phone/email) and the same search inside the company portal
+- In-platform chat between a company and a worker: messages, structured proposals, document exchange, and an explicit "Mark as hired" action that creates the Job
+- Document sharing with an admin review gate, available from first contact onward (not just post-hire)
+- Admin dashboard: document review queue
 - In-app notifications (database records shown in a bell menu)
 
 ### Out of scope (do not build unless asked)
-- Real payment processing (use the mock provider described below)
+- Real payment processing (the `PaymentProvider`/`MockPaymentProvider` interface exists as reference code but nothing in the app calls it)
+- Admin credential verification queue, escrow/payments, disputes — schema and business-rule code exist (see below) but have no UI; explicitly cut by the client
 - Automated licence register lookups, ID checks, ABN API calls (stub them)
 - Native mobile apps, SMS/push/email delivery
-- Ratings and reviews, messaging/chat, timesheets, variations, milestone payments
+- Ratings and reviews, timesheets, variations, milestone payments
 - ATO reporting, GST invoicing, accounting integrations
 - Multi-user company accounts
+- A public job-posting/quoting flow (replaced by direct search-and-hire)
 
 ## Tech Stack
 
@@ -62,19 +64,27 @@ Run `lint`, `typecheck`, and `test` before considering any task finished.
 ```
 src/
   app/
+    (public)/                    landing page, public worker directory (/, /workers, /workers/[id])
     (auth)/login, register
-    worker/         dashboard, onboarding, profile, credentials, jobs, documents
-    company/        dashboard, jobs/new, jobs/[id], workers (search)
-    admin/          dashboard, verifications, documents, disputes, escrow
-    api/files/[id]  authorised file download route
-  components/       shared UI
+    worker/         dashboard, onboarding, messages, messages/[id], jobs, jobs/[id], documents
+    company/        dashboard, workers (search), workers/[id], messages, messages/[id], jobs, jobs/[id]
+    admin/          dashboard, documents
+    api/
+      files/[id]                 authorised file download route
+      conversations/[id]/messages  chat polling endpoint (GET)
+  components/
+    chat/           ChatThread (owns live polled message state + proposal/hire controls), ProposalComposer
+    worker-directory.tsx, worker-profile-detail.tsx  shared by public and company search/profile pages
+    conversation-documents.tsx   admin-reviewed document list + upload, scoped to a Conversation
+    role-nav.tsx, public-nav.tsx
   lib/
     db.ts           Prisma client
     auth.ts         session helpers, requireRole()
-    rules/          business rules (credentials, eligibility, escrow transitions)
-    payments/       PaymentProvider interface + MockPaymentProvider
+    rules/          business rules (credentials, eligibility, escrow transitions — escrow unused, see above)
+    payments/       PaymentProvider interface + MockPaymentProvider (unused, reference only)
+    actions/        conversations.ts (messages, proposals, hiring), documents.ts, notifications.ts
     storage.ts      file save/read with type and size checks
-    notifications.ts
+    notifications.ts  notify() helper
 prisma/
   schema.prisma
   seed.ts
@@ -88,12 +98,11 @@ Keep the Prisma schema close to this. Use string enums.
 - **WorkerProfile**: userId, fullName, phone, abn, primaryTrade, otherTrades[], yearsExperience, bio, hourlyRate, homeState, serviceRadiusKm, postcode, profileStatus (`DRAFT | PENDING_REVIEW | LIVE | HIDDEN`)
 - **CompanyProfile**: userId, companyName, abn, contactName, phone, state, postcode, verified (bool)
 - **Credential**: id, workerId, type (`TRADE_LICENCE | WHITE_CARD | PUBLIC_LIABILITY | WORKERS_COMP | POLICE_CHECK | WWCC | OTHER`), trade (nullable), licenceNumber, issuingState, issuer, expiryDate, fileId, status (`PENDING | APPROVED | REJECTED | EXPIRED`), reviewedBy, reviewedAt, rejectionReason
-- **Job**: id, companyId, title, description, trade, state, postcode, startDate, budget, status (`OPEN | HIRED | IN_PROGRESS | PROOF_SUBMITTED | COMPLETED | DISPUTED | CANCELLED`), hiredWorkerId
-- **Quote**: id, jobId, workerId, amount, message, status (`SUBMITTED | ACCEPTED | DECLINED | WITHDRAWN`)
-- **Document**: id, jobId, uploaderId, recipientId, category (`CONTRACT | DRAWING | SCOPE | SWMS | INDUCTION | PROOF_OF_COMPLETION | OTHER`), fileId, status (`PENDING_REVIEW | APPROVED | REJECTED`), reviewNote
-- **EscrowTransaction**: id, jobId, amount, platformFee, workerPayout, status (see state machine), providerRef, timestamps for each transition
-- **EscrowEvent**: id, escrowId, fromStatus, toStatus, actorId, note, createdAt (append-only audit log)
-- **Dispute**: id, jobId, raisedBy, reason, status (`OPEN | RESOLVED_RELEASE | RESOLVED_REFUND`), resolutionNote
+- **Conversation**: id, companyId, workerId (unique per pair — one thread reused across contact → negotiation → hire), jobId (nullable, set once hired), createdAt. The hub for chat, proposals and documents.
+- **Message**: id, conversationId, senderId, kind (`TEXT | PROPOSAL | SYSTEM`), body, proposalTitle/proposalDescription/proposalBudget (set only when kind = PROPOSAL), createdAt
+- **Job**: id, companyId, workerId (required — a Job only exists once hired), title, description, trade, state, postcode, startDate, budget, status (`HIRED | IN_PROGRESS | COMPLETED | DISPUTED | CANCELLED`, default `HIRED`)
+- **Document**: id, conversationId, uploaderId, recipientId, category (`CONTRACT | DRAWING | SCOPE | SWMS | INDUCTION | PROOF_OF_COMPLETION | OTHER`), fileId, status (`PENDING_REVIEW | APPROVED | REJECTED`), reviewNote — attaches to the **Conversation**, not the Job, so review applies from first contact onward
+- **EscrowTransaction** / **EscrowEvent** / **Dispute**: unchanged shape, but unused reference code (no UI calls these — see "Out of scope")
 - **File**: id, ownerId, originalName, mimeType, sizeBytes, storagePath
 - **Notification**: id, userId, message, link, read, createdAt
 
@@ -126,6 +135,7 @@ LABOURER:    [WHITE_CARD]
 - If a required credential expires, the profile is set to `HIDDEN` and the worker cannot quote on new jobs.
 
 ### Documents
+- Documents attach to a **Conversation**, not a Job — a conversation exists from first contact, so document exchange can (and does, per the client's flow) happen during negotiation, before any hire.
 - Every uploaded document starts as `PENDING_REVIEW` and is invisible to the recipient until an admin approves it.
 - The uploader can always see their own documents and their status.
 - Rejected documents show the admin's note to the uploader only.
@@ -134,7 +144,9 @@ LABOURER:    [WHITE_CARD]
 - Allowed types: PDF, JPG, PNG. Max 10 MB. Check the MIME type from file contents, not just the extension.
 - Files are never served from a public folder. `GET /api/files/[id]` checks that the requester is the owner, an admin, or the recipient of an approved document.
 
-## Escrow State Machine
+## Escrow State Machine (reference only — not wired into the app)
+
+This section describes `src/lib/rules/escrow.ts`, which stays in the codebase, unit-tested, as reference logic. No Server Action or route calls it — escrow/payments were cut from scope. Keep it working and tested; don't build UI for it unless asked.
 
 Implement transitions in `src/lib/rules/escrow.ts` as a single `transition(escrow, action, actor)` function. Any transition not listed must throw. Every successful transition writes an `EscrowEvent`.
 
@@ -165,19 +177,19 @@ Define a `PaymentProvider` interface (`createHold`, `capture`, `release`, `refun
 ## Core User Flows (build and demo these)
 
 1. **Worker onboarding:** register → multi-step wizard (personal details → trade and experience → service area and rate → upload credentials) → submit → profile is `PENDING_REVIEW`.
-2. **Admin verification:** admin opens the queue → views the file next to the entered details → approves or rejects with a reason → worker is notified → profile goes `LIVE` when requirements are met.
-3. **Hiring:** company posts a job → eligible live workers see it and submit quotes → company accepts one → escrow created → company funds it (mock).
-4. **Documents:** company uploads a scope document → admin approves → worker sees it.
-5. **Completion and payment:** worker starts the job → uploads proof → admin approves proof → company approves → funds released → both sides see the escrow timeline.
-6. **Dispute:** either side raises a dispute → escrow frozen → admin resolves with release or refund and a note.
+2. **Admin verification:** not built (see "Out of scope") — in this prototype a profile only ever reaches `LIVE` via seed data.
+3. **Search, contact and hire:** company (or an anonymous visitor on the public directory) searches/browses `LIVE` workers by trade, state and keyword → opens a profile → a logged-in company clicks "Message this worker", which finds-or-creates a `Conversation` → they chat, the company sends a structured `PROPOSAL` message (title, description, budget) → the company clicks "Mark as hired", confirms the job details (prefilled from the latest proposal) → this creates the `Job` (status `HIRED`), links it to the conversation, and posts a `SYSTEM` message.
+4. **Documents:** either party uploads a document on the conversation (available from first contact, not gated on a hire) → admin approves → the other party sees it.
+5. **Notifications:** every message, proposal, hire and document review creates an in-app `Notification` for the other party, read via the bell menu in the nav.
 
 ## Seed Data
 
-`prisma/seed.ts` should create:
+Per the client's later simplification request (see DECISIONS.md), `prisma/seed.ts` now creates a deliberately small set of *functional* demo accounts plus a large pool of browsable-only worker profiles:
 - 1 admin: `admin@demo.test`
-- 2 companies: `builder@demo.test`, `facilities@demo.test`
-- 5 workers across plumbing, electrical, carpentry and labouring, in NSW, VIC and QLD, covering these cases: fully verified and live; pending review; one expired insurance (hidden); one rejected licence; an electrician licensed in NSW only (to demonstrate the state rule)
-- 4 jobs in different statuses, including one with escrow in `PROOF_SUBMITTED` and one `DISPUTED`
+- 1 company: `builder@demo.test` ("Builder Co Pty Ltd")
+- 1 fully-featured worker: `worker.live@demo.test` (Jack Thompson, plumber, NSW, `LIVE` with approved credentials) — the only worker account meant to be logged into; the demo login helper shows exactly these three accounts
+- 20 additional `LIVE` worker profiles across all four trades and every state, for directory search/browsing only — plain data, no credentials, not featured as demo logins
+- The one company and the one worker have **3 jobs together** (2 `IN_PROGRESS`, 1 `DISPUTED`) — each its own Conversation, since a company can now re-hire the same worker (`getOrCreateConversation` reuses an open thread or starts a fresh one; see DECISIONS.md). The same 3 jobs show up on both dashboards. One job has an admin-approved document, one has a document still `PENDING_REVIEW` (keeps the admin queue non-empty), the disputed one has escrow/dispute reference rows attached (see the note above — unused by the app, kept for schema completeness).
 - Sample PDFs/images in `prisma/seed-files/`
 
 All demo passwords: `Password123!`. Show a demo login helper on the login page in development only.
@@ -201,19 +213,20 @@ Write unit tests for, at minimum:
 - ABN checksum validation
 - Fee and payout calculation in cents
 
-One Playwright test covering flow 5 (completion and payment) end to end with seed data.
+One Playwright test covering search → message → proposal → mark as hired → document exchange → admin review, end to end.
 
-## Build Order
+## Build Order (historical)
 
-Work in this order and keep the app runnable after each step:
+This is the order the prototype was actually built in. Steps 1, 2, 6 and 8 were built as described below; steps 3, 5 and 7 were cut by the client before being built (see `DECISIONS.md`); step 4 was built as a job-board flow and later **replaced** by the direct search-and-hire + chat flow described throughout this file — see `DECISIONS.md` for that pivot.
+
 1. Project setup, Prisma schema, seed, auth with roles and role-based layouts
 2. Worker onboarding wizard and file uploads
-3. Admin credential verification queue and profile status logic
-4. Company job posting, worker job feed with eligibility, quotes, hiring
-5. Escrow state machine, mock provider, company/worker escrow views
+3. ~~Admin credential verification queue and profile status logic~~ — cut
+4. ~~Company job posting, worker job feed with eligibility, quotes, hiring~~ — replaced by direct search-and-hire + chat
+5. ~~Escrow state machine, mock provider, company/worker escrow views~~ — cut (rule code kept as reference)
 6. Document sharing with admin review
-7. Disputes and admin escrow overview
-8. Notifications, expiry and auto-release scripts, polish and tests
+7. ~~Disputes and admin escrow overview~~ — cut
+8. Notifications, expiry script, polish and tests
 
 ## Open Questions (waiting on client)
 

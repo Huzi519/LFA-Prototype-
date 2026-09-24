@@ -21,7 +21,11 @@ const DASHBOARD_BY_ROLE: Record<Role, string> = {
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const match = ROLE_PREFIXES.find((r) => pathname.startsWith(r.prefix));
+  // Segment-bound match — plain startsWith would also catch a sibling
+  // public route like /workers under the /worker prefix.
+  const match = ROLE_PREFIXES.find(
+    (r) => pathname === r.prefix || pathname.startsWith(r.prefix + "/")
+  );
   if (!match) return NextResponse.next();
 
   const user = req.auth?.user;

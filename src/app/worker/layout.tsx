@@ -19,7 +19,8 @@ export default async function WorkerLayout({
         links={[
           { href: "/worker/dashboard", label: "Dashboard" },
           { href: "/worker/onboarding", label: "Profile & credentials" },
-          { href: "/worker/jobs", label: "Jobs" },
+          { href: "/worker/messages", label: "Messages" },
+          { href: "/worker/jobs", label: "My jobs" },
           { href: "/worker/documents", label: "Documents" },
         ]}
       />

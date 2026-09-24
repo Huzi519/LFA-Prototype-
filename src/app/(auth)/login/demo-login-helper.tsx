@@ -5,16 +5,13 @@ import { login } from "./actions";
 import { Button } from "@/components/ui/button";
 
 // Development-only quick login for the seeded demo accounts (CLAUDE.md
-// "Seed Data": all demo passwords are Password123!).
+// "Seed Data": all demo passwords are Password123!). Just one account per
+// role — the other ~20 worker profiles in the directory are dummy data for
+// browsing, not meant to be logged into (see DECISIONS.md).
 const DEMO_ACCOUNTS = [
   { label: "Admin", email: "admin@demo.test" },
-  { label: "Company — Builder", email: "builder@demo.test" },
-  { label: "Company — Facilities", email: "facilities@demo.test" },
-  { label: "Worker — live", email: "worker.live@demo.test" },
-  { label: "Worker — pending review", email: "worker.pending@demo.test" },
-  { label: "Worker — hidden (expired)", email: "worker.hidden@demo.test" },
-  { label: "Worker — rejected licence", email: "worker.rejected@demo.test" },
-  { label: "Worker — NSW-only electrician", email: "worker.nsw@demo.test" },
+  { label: "Company — Builder Co", email: "builder@demo.test" },
+  { label: "Worker — Jack Thompson", email: "worker.live@demo.test" },
 ];
 
 export function DemoLoginHelper() {

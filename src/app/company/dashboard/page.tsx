@@ -16,7 +16,7 @@ export default async function CompanyDashboardPage() {
   const recentJobs = profile
     ? await db.job.findMany({
         where: { companyId: profile.id },
-        include: { _count: { select: { quotes: true } } },
+        include: { worker: true },
         orderBy: { createdAt: "desc" },
         take: 5,
       })
@@ -30,11 +30,11 @@ export default async function CompanyDashboardPage() {
             {profile?.companyName ?? "Company"} dashboard
           </h1>
           <p className="text-muted-foreground">
-            Post jobs and review quotes from eligible tradespeople.
+            Search for tradespeople, message them and hire directly.
           </p>
         </div>
-        <Button nativeButton={false} render={<Link href="/company/jobs/new" />}>
-          Post a job
+        <Button nativeButton={false} render={<Link href="/company/workers" />}>
+          Search workers
         </Button>
       </div>
 
@@ -62,7 +62,7 @@ export default async function CompanyDashboardPage() {
         <CardContent>
           {recentJobs.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              You haven&apos;t posted any jobs yet.
+              You haven&apos;t hired anyone yet.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -73,15 +73,10 @@ export default async function CompanyDashboardPage() {
                     className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
                   >
                     <span>
-                      {job.title} · Starts {formatDate(job.startDate)} ·{" "}
-                      {formatCents(job.budget)}
+                      {job.title} · {job.worker.fullName} · Starts{" "}
+                      {formatDate(job.startDate)} · {formatCents(job.budget)}
                     </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
-                        {job._count.quotes} quote{job._count.quotes === 1 ? "" : "s"}
-                      </span>
-                      <Badge variant="outline">{job.status}</Badge>
-                    </span>
+                    <Badge variant="outline">{job.status}</Badge>
                   </Link>
                 </li>
               ))}

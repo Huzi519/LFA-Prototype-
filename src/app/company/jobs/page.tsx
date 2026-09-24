@@ -15,7 +15,7 @@ export default async function CompanyJobsPage() {
 
   const jobs = await db.job.findMany({
     where: { companyId: company.id },
-    include: { _count: { select: { quotes: true } } },
+    include: { worker: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -25,18 +25,19 @@ export default async function CompanyJobsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Your jobs</h1>
           <p className="text-muted-foreground">
-            {jobs.length} job{jobs.length === 1 ? "" : "s"} posted.
+            {jobs.length} worker{jobs.length === 1 ? "" : "s"} hired.
           </p>
         </div>
-        <Button nativeButton={false} render={<Link href="/company/jobs/new" />}>
-          Post a job
+        <Button nativeButton={false} render={<Link href="/company/workers" />}>
+          Search workers
         </Button>
       </div>
 
       {jobs.length === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
-            You haven&apos;t posted any jobs yet.
+            You haven&apos;t hired anyone yet — search for a worker and mark
+            them as hired once you agree on the details.
           </CardContent>
         </Card>
       ) : (
@@ -48,17 +49,14 @@ export default async function CompanyJobsPage() {
                   <div>
                     <CardTitle className="text-base">{job.title}</CardTitle>
                     <p className="text-muted-foreground text-sm">
-                      {job.trade} · {job.state} {job.postcode} · Starts{" "}
-                      {formatDate(job.startDate)}
+                      {job.worker.fullName} · {job.trade} · {job.state}{" "}
+                      {job.postcode} · Starts {formatDate(job.startDate)}
                     </p>
                   </div>
                   <Badge variant="outline">{job.status}</Badge>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between text-sm">
+                <CardContent className="text-sm">
                   <span>{formatCents(job.budget)}</span>
-                  <span className="text-muted-foreground">
-                    {job._count.quotes} quote{job._count.quotes === 1 ? "" : "s"}
-                  </span>
                 </CardContent>
               </Card>
             </Link>

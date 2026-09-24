@@ -12,12 +12,13 @@ import {
   DocumentCategory,
   DocumentStatus,
   JobStatus,
-  QuoteStatus,
+  MessageKind,
   EscrowStatus,
   DisputeStatus,
 } from "../src/generated/prisma";
 import { saveUpload } from "../src/lib/storage";
 import { calculateFeeAndPayout } from "../src/lib/rules/escrow";
+import { isValidAbn } from "../src/lib/rules/abn";
 
 const db = new PrismaClient();
 
@@ -46,6 +47,18 @@ async function fileFromSeed(
   });
 }
 
+/** Deterministically generates `count` distinct ABNs that pass the real checksum. */
+function generateValidAbns(count: number): string[] {
+  const abns: string[] = [];
+  let seed = 100000000;
+  while (abns.length < count) {
+    seed += 7919; // step by a prime so digits vary across the run
+    const candidate = String(1_000_000_0000 + (seed % 89_999_999_999)).slice(0, 11);
+    if (isValidAbn(candidate) && !abns.includes(candidate)) abns.push(candidate);
+  }
+  return abns;
+}
+
 async function main() {
   console.log("Seeding LFA demo data…");
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
@@ -55,7 +68,7 @@ async function main() {
     data: { email: "admin@demo.test", passwordHash, role: Role.ADMIN },
   });
 
-  // ---------- Companies ----------
+  // ---------- The one company ----------
   const builderUser = await db.user.create({
     data: { email: "builder@demo.test", passwordHash, role: Role.COMPANY },
   });
@@ -72,25 +85,7 @@ async function main() {
     },
   });
 
-  const facilitiesUser = await db.user.create({
-    data: { email: "facilities@demo.test", passwordHash, role: Role.COMPANY },
-  });
-  const facilities = await db.companyProfile.create({
-    data: {
-      userId: facilitiesUser.id,
-      companyName: "Facilities Management Group",
-      abn: "51046555916",
-      contactName: "Priya Kaur",
-      phone: "0400 333 444",
-      state: AustralianState.VIC,
-      postcode: "3000",
-      verified: true,
-    },
-  });
-
-  // ---------- Workers ----------
-
-  // 1. Fully verified and live — plumber, NSW
+  // ---------- The one fully-featured worker ----------
   const liveUser = await db.user.create({
     data: { email: "worker.live@demo.test", passwordHash, role: Role.WORKER },
   });
@@ -143,493 +138,295 @@ async function main() {
     });
   }
 
-  // 2. Pending review — carpenter, VIC
-  const pendingUser = await db.user.create({
-    data: {
-      email: "worker.pending@demo.test",
-      passwordHash,
-      role: Role.WORKER,
-    },
-  });
-  const pendingWorker = await db.workerProfile.create({
-    data: {
-      userId: pendingUser.id,
-      fullName: "Maria Souza",
-      phone: "0411 000 002",
-      abn: "17622127362",
-      primaryTrade: Trade.CARPENTER,
-      otherTrades: "[]",
-      yearsExperience: 4,
-      bio: "Carpenter specialising in fit-outs and joinery, recently relocated to Melbourne and building a local client base.",
-      hourlyRate: 7000,
-      homeState: AustralianState.VIC,
-      serviceRadiusKm: 30,
-      postcode: "3000",
-      profileStatus: "PENDING_REVIEW",
-    },
-  });
-  for (const type of [
-    CredentialType.WHITE_CARD,
-    CredentialType.PUBLIC_LIABILITY,
-  ]) {
-    const file = await fileFromSeed(
-      pendingUser.id,
-      "sample-licence.pdf",
-      `${type}.pdf`
-    );
-    await db.credential.create({
+  // ---------- 20 dummy worker profiles for the directory ----------
+  // Plain browsable data only — no credentials, no featured demo login (see
+  // DECISIONS.md: "only one dashboard for the labour").
+  const DUMMY_WORKERS: {
+    fullName: string;
+    trade: Trade;
+    state: AustralianState;
+    postcode: string;
+    years: number;
+    rateDollars: number;
+    radiusKm: number;
+  }[] = [
+    { fullName: "Liam Carter", trade: Trade.PLUMBER, state: AustralianState.NSW, postcode: "2150", years: 6, rateDollars: 85, radiusKm: 30 },
+    { fullName: "Olivia Bennett", trade: Trade.ELECTRICIAN, state: AustralianState.NSW, postcode: "2200", years: 8, rateDollars: 95, radiusKm: 35 },
+    { fullName: "Noah Walker", trade: Trade.CARPENTER, state: AustralianState.NSW, postcode: "2560", years: 4, rateDollars: 75, radiusKm: 25 },
+    { fullName: "Ava Mitchell", trade: Trade.LABOURER, state: AustralianState.NSW, postcode: "2170", years: 3, rateDollars: 55, radiusKm: 40 },
+    { fullName: "Ethan Ross", trade: Trade.PLUMBER, state: AustralianState.VIC, postcode: "3121", years: 12, rateDollars: 105, radiusKm: 30 },
+    { fullName: "Mia Coleman", trade: Trade.ELECTRICIAN, state: AustralianState.VIC, postcode: "3055", years: 7, rateDollars: 92, radiusKm: 35 },
+    { fullName: "Lucas Reid", trade: Trade.CARPENTER, state: AustralianState.VIC, postcode: "3216", years: 15, rateDollars: 88, radiusKm: 45 },
+    { fullName: "Charlotte Hughes", trade: Trade.LABOURER, state: AustralianState.VIC, postcode: "3020", years: 2, rateDollars: 50, radiusKm: 20 },
+    { fullName: "Mason Clarke", trade: Trade.PLUMBER, state: AustralianState.QLD, postcode: "4051", years: 5, rateDollars: 80, radiusKm: 30 },
+    { fullName: "Amelia Foster", trade: Trade.ELECTRICIAN, state: AustralianState.QLD, postcode: "4109", years: 10, rateDollars: 98, radiusKm: 40 },
+    { fullName: "James Turner", trade: Trade.CARPENTER, state: AustralianState.QLD, postcode: "4218", years: 9, rateDollars: 82, radiusKm: 35 },
+    { fullName: "Harper Bell", trade: Trade.LABOURER, state: AustralianState.QLD, postcode: "4350", years: 4, rateDollars: 52, radiusKm: 25 },
+    { fullName: "Benjamin Ward", trade: Trade.PLUMBER, state: AustralianState.WA, postcode: "6053", years: 11, rateDollars: 100, radiusKm: 30 },
+    { fullName: "Isla Hunt", trade: Trade.ELECTRICIAN, state: AustralianState.WA, postcode: "6150", years: 6, rateDollars: 90, radiusKm: 35 },
+    { fullName: "Henry Palmer", trade: Trade.CARPENTER, state: AustralianState.WA, postcode: "6230", years: 3, rateDollars: 70, radiusKm: 20 },
+    { fullName: "Grace Simmons", trade: Trade.LABOURER, state: AustralianState.SA, postcode: "5000", years: 5, rateDollars: 54, radiusKm: 30 },
+    { fullName: "Jack Sullivan", trade: Trade.PLUMBER, state: AustralianState.SA, postcode: "5158", years: 7, rateDollars: 87, radiusKm: 30 },
+    { fullName: "Zoe Marshall", trade: Trade.ELECTRICIAN, state: AustralianState.TAS, postcode: "7000", years: 8, rateDollars: 89, radiusKm: 25 },
+    { fullName: "Leo Whitfield", trade: Trade.CARPENTER, state: AustralianState.ACT, postcode: "2600", years: 13, rateDollars: 91, radiusKm: 30 },
+    { fullName: "Ruby Dawson", trade: Trade.LABOURER, state: AustralianState.NT, postcode: "0800", years: 6, rateDollars: 58, radiusKm: 40 },
+  ];
+
+  const TRADE_BLURB: Record<Trade, string> = {
+    PLUMBER: "plumbing repairs, installations and maintenance",
+    ELECTRICIAN: "residential and commercial electrical work",
+    CARPENTER: "fit-outs, framing and general carpentry",
+    LABOURER: "site labour, demolition and materials handling",
+  };
+
+  const dummyAbns = generateValidAbns(DUMMY_WORKERS.length);
+
+  for (const [i, w] of DUMMY_WORKERS.entries()) {
+    const email = `${w.fullName.toLowerCase().replace(/\s+/g, ".")}@demo.test`;
+    const user = await db.user.create({
+      data: { email, passwordHash, role: Role.WORKER },
+    });
+    await db.workerProfile.create({
       data: {
-        workerId: pendingWorker.id,
-        type,
-        fileId: file.id,
-        status: CredentialStatus.PENDING,
-        expiryDate: daysFromNow(365),
+        userId: user.id,
+        fullName: w.fullName,
+        phone: `04${String(10000000 + i).padStart(8, "0")}`,
+        abn: dummyAbns[i],
+        primaryTrade: w.trade,
+        otherTrades: "[]",
+        yearsExperience: w.years,
+        bio: `Experienced ${w.trade.toLowerCase()} offering ${TRADE_BLURB[w.trade]} across ${w.state}. ${w.years} years in the trade.`,
+        hourlyRate: w.rateDollars * 100,
+        homeState: w.state,
+        serviceRadiusKm: w.radiusKm,
+        postcode: w.postcode,
+        profileStatus: "LIVE",
       },
     });
   }
 
-  // 3. Expired insurance -> hidden — labourer, QLD
-  const hiddenUser = await db.user.create({
-    data: {
-      email: "worker.hidden@demo.test",
-      passwordHash,
-      role: Role.WORKER,
-    },
-  });
-  const hiddenWorker = await db.workerProfile.create({
-    data: {
-      userId: hiddenUser.id,
-      fullName: "Dave Okafor",
-      phone: "0411 000 003",
-      abn: "27103641638",
-      primaryTrade: Trade.LABOURER,
-      otherTrades: "[]",
-      yearsExperience: 6,
-      bio: "General labourer available for demolition, site clean-up and materials handling across Brisbane.",
-      hourlyRate: 5500,
-      homeState: AustralianState.QLD,
-      serviceRadiusKm: 50,
-      postcode: "4000",
-      profileStatus: "HIDDEN",
-    },
-  });
-  const hiddenWhiteCardFile = await fileFromSeed(
-    hiddenUser.id,
-    "sample-licence.pdf",
-    "white-card.pdf"
-  );
-  await db.credential.create({
-    data: {
-      workerId: hiddenWorker.id,
-      type: CredentialType.WHITE_CARD,
-      fileId: hiddenWhiteCardFile.id,
-      status: CredentialStatus.APPROVED, // stored APPROVED — expiry makes it EXPIRED at read time
-      reviewedBy: admin.id,
-      reviewedAt: daysAgo(400),
-      expiryDate: daysAgo(10), // expired 10 days ago
-    },
-  });
+  // ---------- The one company's 3 jobs with the one worker ----------
+  // Each hire is its own Conversation (a company can re-hire the same
+  // worker — see DECISIONS.md), all with Jack Thompson: 2 IN_PROGRESS,
+  // 1 DISPUTED — the same scenario shows up on both dashboards.
 
-  // 4. Rejected licence — electrician, VIC
-  const rejectedUser = await db.user.create({
-    data: {
-      email: "worker.rejected@demo.test",
-      passwordHash,
-      role: Role.WORKER,
-    },
-  });
-  const rejectedWorker = await db.workerProfile.create({
-    data: {
-      userId: rejectedUser.id,
-      fullName: "Liam Fitzgerald",
-      phone: "0411 000 004",
-      abn: "76211272261",
-      primaryTrade: Trade.ELECTRICIAN,
-      otherTrades: "[]",
-      yearsExperience: 3,
-      bio: "Electrician currently resolving a licence document issue with the platform before taking on jobs.",
-      hourlyRate: 8000,
-      homeState: AustralianState.VIC,
-      serviceRadiusKm: 25,
-      postcode: "3121",
-      profileStatus: "PENDING_REVIEW",
-    },
-  });
-  const rejectedLicenceFile = await fileFromSeed(
-    rejectedUser.id,
-    "sample-licence.pdf",
-    "trade-licence.pdf"
-  );
-  await db.credential.create({
-    data: {
-      workerId: rejectedWorker.id,
-      type: CredentialType.TRADE_LICENCE,
-      trade: Trade.ELECTRICIAN,
-      licenceNumber: "EL-40021",
-      issuingState: AustralianState.VIC,
-      issuer: "Energy Safe Victoria",
-      fileId: rejectedLicenceFile.id,
-      status: CredentialStatus.REJECTED,
-      reviewedBy: admin.id,
-      reviewedAt: daysAgo(5),
-      rejectionReason:
-        "The uploaded document is illegible — please re-upload a clear scan of your current licence.",
-      expiryDate: daysFromNow(365),
-    },
-  });
-
-  // 5. Electrician licensed in NSW only — live, demonstrates the state rule
-  const nswUser = await db.user.create({
-    data: { email: "worker.nsw@demo.test", passwordHash, role: Role.WORKER },
-  });
-  const nswWorker = await db.workerProfile.create({
-    data: {
-      userId: nswUser.id,
-      fullName: "Chen Wei",
-      phone: "0411 000 005",
-      abn: "88000014675",
-      primaryTrade: Trade.ELECTRICIAN,
-      otherTrades: "[]",
-      yearsExperience: 11,
-      bio: "Fully licensed electrician based in Sydney, available for commercial and residential rewiring and switchboard upgrades.",
-      hourlyRate: 10500,
-      homeState: AustralianState.NSW,
-      serviceRadiusKm: 60,
-      postcode: "2010",
-      profileStatus: "LIVE",
-    },
-  });
-  for (const [type, extra] of [
-    [
-      CredentialType.TRADE_LICENCE,
-      {
-        trade: Trade.ELECTRICIAN,
-        licenceNumber: "EL-10098",
-        issuingState: AustralianState.NSW,
-        issuer: "NSW Fair Trading",
-        expiryDate: daysFromNow(500),
-      },
-    ],
-    [CredentialType.WHITE_CARD, { expiryDate: daysFromNow(700) }],
-    [CredentialType.PUBLIC_LIABILITY, { expiryDate: daysFromNow(400) }],
-  ] as const) {
-    const file = await fileFromSeed(
-      nswUser.id,
-      "sample-licence.pdf",
-      `${type}.pdf`
-    );
-    await db.credential.create({
-      data: {
-        workerId: nswWorker.id,
-        type,
-        fileId: file.id,
-        status: CredentialStatus.APPROVED,
-        reviewedBy: admin.id,
-        reviewedAt: daysAgo(60),
-        ...extra,
-      },
+  async function hireIntoJob(params: {
+    title: string;
+    description: string;
+    budgetDollars: number;
+    status: typeof JobStatus.IN_PROGRESS | typeof JobStatus.DISPUTED;
+    startedDaysAgo: number;
+    firstMessageDaysAgo: number;
+  }) {
+    const conversation = await db.conversation.create({
+      data: { companyId: builder.id, workerId: liveWorker.id },
     });
-  }
+    const budgetCents = params.budgetDollars * 100;
 
-  // ---------- Jobs ----------
-
-  // Job A: OPEN — Builder Co, plumber, NSW. A couple of open quotes.
-  const jobOpen = await db.job.create({
-    data: {
-      companyId: builder.id,
-      title: "Kitchen pipe replacement",
-      description:
-        "Replace ageing copper pipework under the kitchen sink and connect a new dishwasher line. Half-day job.",
-      trade: Trade.PLUMBER,
-      state: AustralianState.NSW,
-      postcode: "2010",
-      startDate: daysFromNow(10),
-      budget: 60000,
-      status: JobStatus.OPEN,
-    },
-  });
-  await db.quote.create({
-    data: {
-      jobId: jobOpen.id,
-      workerId: liveWorker.id,
-      amount: 55000,
-      message: "Can start next week, happy to supply fittings.",
-      status: QuoteStatus.SUBMITTED,
-    },
-  });
-
-  // Job B: IN_PROGRESS — Facilities Co, electrician (NSW), hired worker.nsw.
-  // Escrow: FUNDED -> IN_PROGRESS.
-  const jobInProgress = await db.job.create({
-    data: {
-      companyId: facilities.id,
-      title: "Office switchboard upgrade",
-      description:
-        "Upgrade the main switchboard for a 12-desk office fit-out, including new circuit breakers and safety switches.",
-      trade: Trade.ELECTRICIAN,
-      state: AustralianState.NSW,
-      postcode: "2010",
-      startDate: daysAgo(2),
-      budget: 320000,
-      status: JobStatus.IN_PROGRESS,
-      hiredWorkerId: nswWorker.id,
-    },
-  });
-  const quoteB = await db.quote.create({
-    data: {
-      jobId: jobInProgress.id,
-      workerId: nswWorker.id,
-      amount: 300000,
-      message: "Can do this over two days, including compliance certificate.",
-      status: QuoteStatus.ACCEPTED,
-    },
-  });
-  {
-    const { platformFee, workerPayout } = calculateFeeAndPayout(
-      quoteB.amount
-    );
-    const escrowB = await db.escrowTransaction.create({
-      data: {
-        jobId: jobInProgress.id,
-        amount: quoteB.amount,
-        platformFee,
-        workerPayout,
-        status: EscrowStatus.IN_PROGRESS,
-        providerRef: "hold_seed_b",
-        fundedAt: daysAgo(3),
-        startedAt: daysAgo(2),
-      },
-    });
-    await db.escrowEvent.createMany({
+    await db.message.createMany({
       data: [
         {
-          escrowId: escrowB.id,
-          fromStatus: EscrowStatus.AWAITING_FUNDING,
-          toStatus: EscrowStatus.FUNDED,
-          actorId: facilitiesUser.id,
-          note: "Job funded (mock payment).",
-          createdAt: daysAgo(3),
+          conversationId: conversation.id,
+          senderId: builderUser.id,
+          kind: MessageKind.TEXT,
+          body: `Hi Jack, we've got a job — ${params.title.toLowerCase()}. Are you free?`,
+          createdAt: daysAgo(params.firstMessageDaysAgo),
         },
         {
-          escrowId: escrowB.id,
-          fromStatus: EscrowStatus.FUNDED,
-          toStatus: EscrowStatus.IN_PROGRESS,
-          actorId: nswUser.id,
-          note: "Worker started the job.",
-          createdAt: daysAgo(2),
+          conversationId: conversation.id,
+          senderId: liveUser.id,
+          kind: MessageKind.PROPOSAL,
+          body: `Proposal: ${params.title} — $${params.budgetDollars.toFixed(2)}`,
+          proposalTitle: params.title,
+          proposalDescription: params.description,
+          proposalBudget: budgetCents,
+          createdAt: daysAgo(params.firstMessageDaysAgo - 1),
         },
       ],
     });
-  }
 
-  // Job C: PROOF_SUBMITTED — Builder Co, plumber, hired worker.live.
-  // Escrow PROOF_SUBMITTED, proof document already admin-approved, awaiting
-  // company approval.
-  const jobProof = await db.job.create({
-    data: {
-      companyId: builder.id,
-      title: "Bathroom fit-out plumbing",
-      description:
-        "Rough-in and fit-off plumbing for a full bathroom renovation, including new shower and vanity connections.",
-      trade: Trade.PLUMBER,
-      state: AustralianState.NSW,
-      postcode: "2000",
-      startDate: daysAgo(6),
-      budget: 450000,
-      status: JobStatus.PROOF_SUBMITTED,
-      hiredWorkerId: liveWorker.id,
-    },
-  });
-  const quoteC = await db.quote.create({
-    data: {
-      jobId: jobProof.id,
-      workerId: liveWorker.id,
-      amount: 420000,
-      message: "Includes all fittings and a compliance certificate.",
-      status: QuoteStatus.ACCEPTED,
-    },
-  });
-  const proofFile = await fileFromSeed(
-    liveUser.id,
-    "sample-photo.png",
-    "completed-bathroom.png"
-  );
-  await db.document.create({
-    data: {
-      jobId: jobProof.id,
-      uploaderId: liveUser.id,
-      recipientId: builderUser.id,
-      category: DocumentCategory.PROOF_OF_COMPLETION,
-      fileId: proofFile.id,
-      status: DocumentStatus.APPROVED,
-      reviewNote: "Photos confirm the described work.",
-    },
-  });
-  {
-    const { platformFee, workerPayout } = calculateFeeAndPayout(
-      quoteC.amount
-    );
-    const escrowC = await db.escrowTransaction.create({
+    const job = await db.job.create({
       data: {
-        jobId: jobProof.id,
-        amount: quoteC.amount,
+        companyId: builder.id,
+        workerId: liveWorker.id,
+        title: params.title,
+        description: params.description,
+        trade: Trade.PLUMBER,
+        state: AustralianState.NSW,
+        postcode: "2000",
+        startDate: daysAgo(params.startedDaysAgo),
+        budget: budgetCents,
+        status: params.status,
+      },
+    });
+    await db.conversation.update({
+      where: { id: conversation.id },
+      data: { jobId: job.id },
+    });
+    await db.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: builderUser.id,
+        kind: MessageKind.SYSTEM,
+        body: `Jack Thompson was marked as hired for "${params.title}".`,
+        createdAt: daysAgo(params.startedDaysAgo),
+      },
+    });
+
+    const { platformFee, workerPayout } = calculateFeeAndPayout(budgetCents);
+    const escrow = await db.escrowTransaction.create({
+      data: {
+        jobId: job.id,
+        amount: budgetCents,
         platformFee,
         workerPayout,
-        status: EscrowStatus.PROOF_SUBMITTED,
-        providerRef: "hold_seed_c",
-        fundedAt: daysAgo(6),
-        startedAt: daysAgo(5),
-        proofSubmittedAt: daysAgo(1),
+        status:
+          params.status === JobStatus.DISPUTED
+            ? EscrowStatus.DISPUTED
+            : EscrowStatus.IN_PROGRESS,
+        providerRef: `hold_${job.id}`,
+        fundedAt: daysAgo(params.startedDaysAgo + 1),
+        startedAt: daysAgo(params.startedDaysAgo),
       },
     });
     await db.escrowEvent.createMany({
       data: [
         {
-          escrowId: escrowC.id,
+          escrowId: escrow.id,
           fromStatus: EscrowStatus.AWAITING_FUNDING,
           toStatus: EscrowStatus.FUNDED,
           actorId: builderUser.id,
           note: "Job funded (mock payment).",
-          createdAt: daysAgo(6),
+          createdAt: daysAgo(params.startedDaysAgo + 1),
         },
         {
-          escrowId: escrowC.id,
+          escrowId: escrow.id,
           fromStatus: EscrowStatus.FUNDED,
           toStatus: EscrowStatus.IN_PROGRESS,
           actorId: liveUser.id,
           note: "Worker started the job.",
-          createdAt: daysAgo(5),
-        },
-        {
-          escrowId: escrowC.id,
-          fromStatus: EscrowStatus.IN_PROGRESS,
-          toStatus: EscrowStatus.PROOF_SUBMITTED,
-          actorId: liveUser.id,
-          note: "Proof of completion submitted.",
-          createdAt: daysAgo(1),
+          createdAt: daysAgo(params.startedDaysAgo),
         },
       ],
     });
+
+    return { conversation, job, escrow };
   }
 
-  // Job D: DISPUTED — Facilities Co, carpenter, hired worker.pending
-  // (seed only — normally only LIVE workers can be hired).
-  const jobDisputed = await db.job.create({
+  // Job 1: IN_PROGRESS, with an admin-approved contract document.
+  const job1 = await hireIntoJob({
+    title: "Bathroom renovation plumbing",
+    description:
+      "Rough-in and fit-off plumbing for a full bathroom renovation, including new shower and vanity connections.",
+    budgetDollars: 3000,
+    status: JobStatus.IN_PROGRESS,
+    startedDaysAgo: 3,
+    firstMessageDaysAgo: 6,
+  });
+  const contractFile = await fileFromSeed(
+    builderUser.id,
+    "sample-licence.pdf",
+    "draft-contract.pdf"
+  );
+  await db.document.create({
     data: {
-      companyId: facilities.id,
-      title: "Warehouse shelving install",
-      description:
-        "Install freestanding timber shelving units across the warehouse mezzanine.",
-      trade: Trade.CARPENTER,
-      state: AustralianState.VIC,
-      postcode: "3000",
-      startDate: daysAgo(8),
-      budget: 180000,
-      status: JobStatus.DISPUTED,
-      hiredWorkerId: pendingWorker.id,
+      conversationId: job1.conversation.id,
+      uploaderId: builderUser.id,
+      recipientId: liveUser.id,
+      category: DocumentCategory.CONTRACT,
+      fileId: contractFile.id,
+      status: DocumentStatus.APPROVED,
+      reviewNote: "Standard contract template, cleared.",
     },
   });
-  const quoteD = await db.quote.create({
+
+  // Job 2: IN_PROGRESS, with a document still awaiting admin review — keeps
+  // the admin document queue non-empty for the demo.
+  const job2 = await hireIntoJob({
+    title: "Kitchen pipe replacement",
+    description:
+      "Replace ageing copper pipework under the kitchen sink and connect a new dishwasher line.",
+    budgetDollars: 1800,
+    status: JobStatus.IN_PROGRESS,
+    startedDaysAgo: 6,
+    firstMessageDaysAgo: 9,
+  });
+  const scopeFile = await fileFromSeed(
+    liveUser.id,
+    "sample-photo.png",
+    "kitchen-scope-photo.png"
+  );
+  await db.document.create({
     data: {
-      jobId: jobDisputed.id,
-      workerId: pendingWorker.id,
-      amount: 170000,
-      message: "Can complete within a week.",
-      status: QuoteStatus.ACCEPTED,
+      conversationId: job2.conversation.id,
+      uploaderId: liveUser.id,
+      recipientId: builderUser.id,
+      category: DocumentCategory.SCOPE,
+      fileId: scopeFile.id,
+      status: DocumentStatus.PENDING_REVIEW,
     },
   });
-  {
-    const { platformFee, workerPayout } = calculateFeeAndPayout(
-      quoteD.amount
-    );
-    const escrowD = await db.escrowTransaction.create({
-      data: {
-        jobId: jobDisputed.id,
-        amount: quoteD.amount,
-        platformFee,
-        workerPayout,
-        status: EscrowStatus.DISPUTED,
-        providerRef: "hold_seed_d",
-        fundedAt: daysAgo(8),
-        startedAt: daysAgo(7),
-      },
-    });
-    await db.escrowEvent.createMany({
-      data: [
-        {
-          escrowId: escrowD.id,
-          fromStatus: EscrowStatus.AWAITING_FUNDING,
-          toStatus: EscrowStatus.FUNDED,
-          actorId: facilitiesUser.id,
-          note: "Job funded (mock payment).",
-          createdAt: daysAgo(8),
-        },
-        {
-          escrowId: escrowD.id,
-          fromStatus: EscrowStatus.FUNDED,
-          toStatus: EscrowStatus.IN_PROGRESS,
-          actorId: pendingUser.id,
-          note: "Worker started the job.",
-          createdAt: daysAgo(7),
-        },
-        {
-          escrowId: escrowD.id,
-          fromStatus: EscrowStatus.IN_PROGRESS,
-          toStatus: EscrowStatus.DISPUTED,
-          actorId: facilitiesUser.id,
-          note: "Dispute raised over incomplete shelving units.",
-          createdAt: daysAgo(1),
-        },
-      ],
-    });
-    await db.dispute.create({
-      data: {
-        jobId: jobDisputed.id,
-        raisedBy: facilitiesUser.id,
-        reason:
-          "Only half of the shelving units were installed and the worker has stopped responding.",
-        status: DisputeStatus.OPEN,
-      },
-    });
-  }
+
+  // Job 3: DISPUTED.
+  const job3 = await hireIntoJob({
+    title: "Hot water system installation",
+    description:
+      "Remove the old electric hot water unit and install a new gas continuous-flow system.",
+    budgetDollars: 2200,
+    status: JobStatus.DISPUTED,
+    startedDaysAgo: 8,
+    firstMessageDaysAgo: 11,
+  });
+  await db.escrowEvent.create({
+    data: {
+      escrowId: job3.escrow.id,
+      fromStatus: EscrowStatus.IN_PROGRESS,
+      toStatus: EscrowStatus.DISPUTED,
+      actorId: builderUser.id,
+      note: "Dispute raised — installed unit doesn't match the agreed model.",
+      createdAt: daysAgo(1),
+    },
+  });
+  await db.dispute.create({
+    data: {
+      jobId: job3.job.id,
+      raisedBy: builderUser.id,
+      reason:
+        "The installed hot water unit doesn't match the model agreed in the proposal.",
+      status: DisputeStatus.OPEN,
+    },
+  });
+  await db.message.create({
+    data: {
+      conversationId: job3.conversation.id,
+      senderId: builderUser.id,
+      kind: MessageKind.TEXT,
+      body: "This isn't the unit we agreed on — we need to sort this out.",
+      createdAt: daysAgo(1),
+    },
+  });
 
   // ---------- Notifications ----------
   await db.notification.createMany({
     data: [
       {
-        userId: pendingUser.id,
-        message: "Your credentials are awaiting admin review.",
-        link: "/worker/credentials",
-      },
-      {
-        userId: rejectedUser.id,
-        message: "Your trade licence was rejected — see the reason and re-upload.",
-        link: "/worker/credentials",
-      },
-      {
-        userId: hiddenUser.id,
-        message: "Your public liability insurance has expired — your profile is hidden.",
-        link: "/worker/credentials",
-      },
-      {
-        userId: facilitiesUser.id,
-        message: "A dispute was opened on 'Warehouse shelving install'.",
-        link: `/company/jobs/${jobDisputed.id}`,
+        userId: liveUser.id,
+        message: 'A dispute was raised on "Hot water system installation".',
+        link: `/worker/messages/${job3.conversation.id}`,
       },
       {
         userId: builderUser.id,
-        message: "Proof of completion was approved for 'Bathroom fit-out plumbing' — review and release payment.",
-        link: `/company/jobs/${jobProof.id}`,
+        message: "A document is awaiting admin review on \"Kitchen pipe replacement\".",
+        link: `/company/messages/${job2.conversation.id}`,
       },
     ],
   });
 
   console.log("Seed complete.");
-  console.log(`  Admin:      admin@demo.test`);
-  console.log(`  Companies:  builder@demo.test, facilities@demo.test`);
-  console.log(
-    `  Workers:    worker.live@demo.test, worker.pending@demo.test, worker.hidden@demo.test, worker.rejected@demo.test, worker.nsw@demo.test`
-  );
+  console.log(`  Admin:    admin@demo.test`);
+  console.log(`  Company:  builder@demo.test`);
+  console.log(`  Worker:   worker.live@demo.test`);
+  console.log(`  Plus ${DUMMY_WORKERS.length} browsable dummy worker profiles.`);
   console.log(`  Password (all): ${DEMO_PASSWORD}`);
 }
 

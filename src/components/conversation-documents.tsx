@@ -5,23 +5,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 
 /**
- * Documents for a job, from the current viewer's perspective. Per CLAUDE.md
- * "Documents": the uploader always sees their own documents and status
- * (rejected ones with the admin's note); the recipient only ever sees
- * APPROVED documents.
+ * Documents for a conversation, from the current viewer's perspective. Per
+ * CLAUDE.md "Documents": the uploader always sees their own documents and
+ * status (rejected ones with the admin's note); the recipient only ever
+ * sees APPROVED documents. Available from first contact onward — a
+ * Conversation exists before any Job does (see DECISIONS.md).
  */
-export async function JobDocuments({
-  jobId,
+export async function ConversationDocuments({
+  conversationId,
   viewerUserId,
-  canUpload,
 }: {
-  jobId: string;
+  conversationId: string;
   viewerUserId: string;
-  canUpload: boolean;
 }) {
   const documents = await db.document.findMany({
     where: {
-      jobId,
+      conversationId,
       OR: [{ uploaderId: viewerUserId }, { recipientId: viewerUserId, status: "APPROVED" }],
     },
     include: { file: true, uploader: true },
@@ -77,7 +76,7 @@ export async function JobDocuments({
         </div>
       )}
 
-      {canUpload && <DocumentUploadForm jobId={jobId} />}
+      <DocumentUploadForm conversationId={conversationId} />
     </div>
   );
 }

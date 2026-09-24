@@ -66,21 +66,21 @@ enum CredentialStatus {
   EXPIRED
 }
 
+// A Job only ever exists once a company has hired a worker out of a
+// Conversation (see MessageKind / "Mark as hired") — there is no OPEN
+// status because there is no public job posting any more.
 enum JobStatus {
-  OPEN
   HIRED
   IN_PROGRESS
-  PROOF_SUBMITTED
   COMPLETED
   DISPUTED
   CANCELLED
 }
 
-enum QuoteStatus {
-  SUBMITTED
-  ACCEPTED
-  DECLINED
-  WITHDRAWN
+enum MessageKind {
+  TEXT
+  PROPOSAL
+  SYSTEM
 }
 
 enum DocumentCategory {
@@ -128,37 +128,40 @@ model User {
   workerProfile  WorkerProfile?
   companyProfile CompanyProfile?
 
-  files             File[]
-  notifications     Notification[]
-  uploadedDocuments Document[]      @relation("DocumentUploader")
-  receivedDocuments Document[]      @relation("DocumentRecipient")
-  disputesRaised    Dispute[]       @relation("DisputeRaisedBy")
-  reviewedCredentials Credential[]  @relation("CredentialReviewer")
-  escrowEvents      EscrowEvent[]
+  files               File[]
+  notifications       Notification[]
+  sentMessages        Message[]    @relation("MessageSender")
+  uploadedDocuments   Document[]   @relation("DocumentUploader")
+  receivedDocuments   Document[]   @relation("DocumentRecipient")
+  disputesRaised      Dispute[]    @relation("DisputeRaisedBy")
+  reviewedCredentials Credential[] @relation("CredentialReviewer")
+  escrowEvents        EscrowEvent[]
 }
 
 model WorkerProfile {
-  id               String          @id @default(cuid())
-  userId           String          @unique
-  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName         String
-  phone            String
-  abn              String
-  primaryTrade     Trade
-  otherTrades      String // JSON-encoded string[] (SQLite has no native array type)
-  yearsExperience  Int
-  bio              String
-  hourlyRate       Int // cents
-  homeState        AustralianState
-  serviceRadiusKm  Int
-  postcode         String
-  profileStatus    ProfileStatus   @default(DRAFT)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName        String
+  phone           String
+  abn             String
+  primaryTrade    Trade
+  otherTrades     String // JSON-encoded string[] (SQLite has no native array type)
+  yearsExperience Int
+  bio             String
+  hourlyRate      Int // cents
+  homeState       AustralianState
+  serviceRadiusKm Int
+  postcode        String
+  profileStatus   ProfileStatus   @default(DRAFT)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  credentials Credential[]
-  quotes      Quote[]
-  hiredJobs   Job[]        @relation("HiredWorker")
+  credentials   Credential[]
+  jobs          Job[]
+  conversations Conversation[]
+
+  @@index([profileStatus, primaryTrade])
 }
 
 model CompanyProfile {
@@ -174,106 +177,130 @@ model CompanyProfile {
   verified    Boolean         @default(false)
   createdAt   DateTime        @default(now())
 
-  jobs Job[]
+  jobs          Job[]
+  conversations Conversation[]
 }
 
 model Credential {
-  id             String           @id @default(cuid())
-  workerId       String
-  worker         WorkerProfile    @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  type           CredentialType
-  trade          Trade?
-  licenceNumber  String?
-  issuingState   AustralianState?
-  issuer         String?
-  expiryDate     DateTime?
-  fileId         String
-  file           File             @relation(fields: [fileId], references: [id])
-  status         CredentialStatus @default(PENDING)
-  reviewedBy     String?
-  reviewer       User?            @relation("CredentialReviewer", fields: [reviewedBy], references: [id])
-  reviewedAt     DateTime?
+  id              String           @id @default(cuid())
+  workerId        String
+  worker          WorkerProfile    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  type            CredentialType
+  trade           Trade?
+  licenceNumber   String?
+  issuingState    AustralianState?
+  issuer          String?
+  expiryDate      DateTime?
+  fileId          String
+  file            File             @relation(fields: [fileId], references: [id])
+  status          CredentialStatus @default(PENDING)
+  reviewedBy      String?
+  reviewer        User?            @relation("CredentialReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt      DateTime?
   rejectionReason String?
-  createdAt      DateTime         @default(now())
+  createdAt       DateTime         @default(now())
 
   @@index([workerId])
 }
 
-model Job {
-  id            String    @id @default(cuid())
-  companyId     String
-  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  title         String
-  description   String
-  trade         Trade
-  state         AustralianState
-  postcode      String
-  startDate     DateTime
-  budget        Int // cents
-  status        JobStatus @default(OPEN)
-  hiredWorkerId String?
-  hiredWorker   WorkerProfile? @relation("HiredWorker", fields: [hiredWorkerId], references: [id])
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+// A conversation is the hub for a company/worker relationship: chat,
+// proposals and document exchange all happen here, from first contact
+// through to (optionally) a hire. Not unique per company/worker pair — a
+// company can hire the same worker again later, which starts a fresh
+// conversation (getOrCreateConversation reuses the pair's still-open
+// thread if one exists, otherwise starts a new one; see DECISIONS.md).
+model Conversation {
+  id        String   @id @default(cuid())
+  companyId String
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workerId  String
+  worker    WorkerProfile  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  jobId     String?  @unique
+  job       Job?     @relation(fields: [jobId], references: [id])
+  createdAt DateTime @default(now())
 
-  quotes    Quote[]
+  messages  Message[]
   documents Document[]
-  escrow    EscrowTransaction?
-  disputes  Dispute[]
 
-  @@index([companyId])
-  @@index([trade, state])
+  @@index([companyId, workerId])
 }
 
-model Quote {
-  id        String      @id @default(cuid())
-  jobId     String
-  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  workerId  String
-  worker    WorkerProfile @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  amount    Int // cents
-  message   String
-  status    QuoteStatus @default(SUBMITTED)
-  createdAt DateTime    @default(now())
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  kind           MessageKind  @default(TEXT)
+  body           String
+  // Set only when kind = PROPOSAL — a structured summary of the proposed work.
+  proposalTitle       String?
+  proposalDescription String?
+  proposalBudget      Int? // cents
+  createdAt           DateTime @default(now())
 
-  @@index([jobId])
+  @@index([conversationId, createdAt])
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workerId    String
+  worker      WorkerProfile  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  trade       Trade
+  state       AustralianState
+  postcode    String
+  startDate   DateTime
+  budget      Int // cents
+  status      JobStatus @default(HIRED)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  conversation Conversation?
+  escrow       EscrowTransaction?
+  disputes     Dispute[]
+
+  @@index([companyId])
   @@index([workerId])
 }
 
 model Document {
-  id          String           @id @default(cuid())
-  jobId       String
-  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  uploaderId  String
-  uploader    User             @relation("DocumentUploader", fields: [uploaderId], references: [id])
-  recipientId String
-  recipient   User             @relation("DocumentRecipient", fields: [recipientId], references: [id])
-  category    DocumentCategory
-  fileId      String
-  file        File             @relation(fields: [fileId], references: [id])
-  status      DocumentStatus   @default(PENDING_REVIEW)
-  reviewNote  String?
-  createdAt   DateTime         @default(now())
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  uploaderId     String
+  uploader       User             @relation("DocumentUploader", fields: [uploaderId], references: [id])
+  recipientId    String
+  recipient      User             @relation("DocumentRecipient", fields: [recipientId], references: [id])
+  category       DocumentCategory
+  fileId         String
+  file           File             @relation(fields: [fileId], references: [id])
+  status         DocumentStatus   @default(PENDING_REVIEW)
+  reviewNote     String?
+  createdAt      DateTime         @default(now())
 
-  @@index([jobId])
+  @@index([conversationId])
   @@index([recipientId])
 }
 
 model EscrowTransaction {
-  id            String       @id @default(cuid())
-  jobId         String       @unique
-  job           Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  amount        Int // cents, total funded by company
-  platformFee   Int // cents
-  workerPayout  Int // cents
-  status        EscrowStatus @default(AWAITING_FUNDING)
-  providerRef   String?
-  fundedAt      DateTime?
-  startedAt     DateTime?
+  id               String       @id @default(cuid())
+  jobId            String       @unique
+  job              Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  amount           Int // cents, total funded by company
+  platformFee      Int // cents
+  workerPayout     Int // cents
+  status           EscrowStatus @default(AWAITING_FUNDING)
+  providerRef      String?
+  fundedAt         DateTime?
+  startedAt        DateTime?
   proofSubmittedAt DateTime?
-  releasedAt    DateTime?
-  refundedAt    DateTime?
-  createdAt     DateTime     @default(now())
+  releasedAt       DateTime?
+  refundedAt       DateTime?
+  createdAt        DateTime     @default(now())
 
   events EscrowEvent[]
 }

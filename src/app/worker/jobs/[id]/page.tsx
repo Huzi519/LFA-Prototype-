@@ -1,14 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
-import { canWorkerTakeJob } from "@/lib/rules/credentials";
 import { formatCents, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { QuoteForm } from "./quote-form";
-import { JobDocuments } from "@/components/job-documents";
 
 export default async function WorkerJobDetailPage({
   params,
@@ -19,20 +16,13 @@ export default async function WorkerJobDetailPage({
   const user = await requireRole(Role.WORKER);
   const profile = await db.workerProfile.findUniqueOrThrow({
     where: { userId: user.id },
-    include: { credentials: true },
   });
 
   const job = await db.job.findUnique({
     where: { id },
-    include: { company: true },
+    include: { company: true, conversation: true },
   });
-  if (!job) notFound();
-
-  const myQuote = await db.quote.findFirst({
-    where: { jobId: job.id, workerId: profile.id },
-  });
-
-  const eligibility = canWorkerTakeJob(profile, job, profile.credentials);
+  if (!job || job.workerId !== profile.id) notFound();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -53,39 +43,13 @@ export default async function WorkerJobDetailPage({
         </CardContent>
       </Card>
 
-      {myQuote ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Your quote</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p>Amount: {formatCents(myQuote.amount)}</p>
-            <p>Message: {myQuote.message}</p>
-            <p>
-              Status: <Badge variant="outline">{myQuote.status}</Badge>
-            </p>
-          </CardContent>
-        </Card>
-      ) : job.status !== "OPEN" ? (
-        <Alert>
-          <AlertDescription>This job is no longer open for quotes.</AlertDescription>
-        </Alert>
-      ) : profile.profileStatus !== "LIVE" ? (
-        <Alert>
-          <AlertDescription>
-            Your profile must be live before you can submit a quote.
-          </AlertDescription>
-        </Alert>
-      ) : !eligibility.allowed ? (
-        <Alert variant="destructive">
-          <AlertDescription>{eligibility.reason}</AlertDescription>
-        </Alert>
-      ) : (
-        <QuoteForm jobId={job.id} />
-      )}
-
-      {job.hiredWorkerId === profile.id && (
-        <JobDocuments jobId={job.id} viewerUserId={user.id} canUpload />
+      {job.conversation && (
+        <Link
+          href={`/worker/messages/${job.conversation.id}`}
+          className="text-sm underline underline-offset-4"
+        >
+          View conversation & documents
+        </Link>
       )}
     </div>
   );

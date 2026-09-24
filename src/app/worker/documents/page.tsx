@@ -16,7 +16,7 @@ export default async function WorkerDocumentsPage() {
         { recipientId: user.id, status: "APPROVED" },
       ],
     },
-    include: { file: true, job: { include: { company: true } } },
+    include: { file: true, conversation: { include: { company: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -25,15 +25,16 @@ export default async function WorkerDocumentsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Documents</h1>
         <p className="text-muted-foreground">
-          Every document you&apos;ve shared or received, across all your jobs.
+          Every document you&apos;ve shared or received, across all your
+          conversations.
         </p>
       </div>
 
       {documents.length === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground py-8 text-center text-sm">
-            No documents yet — they appear here once shared on a job you&apos;ve
-            been hired for.
+            No documents yet — they appear here once shared in a conversation
+            with a company.
           </CardContent>
         </Card>
       ) : (
@@ -41,15 +42,19 @@ export default async function WorkerDocumentsPage() {
           {documents.map((doc) => {
             const isUploader = doc.uploaderId === user.id;
             return (
-              <Link key={doc.id} href={`/worker/jobs/${doc.jobId}`} className="block">
+              <Link
+                key={doc.id}
+                href={`/worker/messages/${doc.conversationId}`}
+                className="block"
+              >
                 <Card className="hover:bg-muted/50 transition-colors">
                   <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
                     <div>
                       <p className="font-medium">
-                        {doc.category.replace(/_/g, " ")} — {doc.job.title}
+                        {doc.category.replace(/_/g, " ")} —{" "}
+                        {doc.conversation.company.companyName}
                       </p>
                       <p className="text-muted-foreground">
-                        {doc.job.company.companyName} ·{" "}
                         {isUploader ? "You uploaded" : "They uploaded"} ·{" "}
                         {doc.file.originalName} · {formatDate(doc.createdAt)}
                       </p>
