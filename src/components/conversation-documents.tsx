@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentUploadForm } from "@/components/document-upload-form";
 
@@ -29,7 +29,7 @@ export async function ConversationDocuments({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Documents</h2>
+      <h2 className="display-md text-xl">Documents</h2>
 
       {documents.length === 0 ? (
         <p className="text-muted-foreground text-sm">No documents shared yet.</p>
@@ -39,11 +39,11 @@ export async function ConversationDocuments({
             const isUploader = doc.uploaderId === viewerUserId;
             return (
               <Card key={doc.id}>
-                <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
+                <CardContent className="flex items-center justify-between gap-4 text-sm">
                   <div>
                     <p className="font-medium">{doc.category.replace(/_/g, " ")}</p>
                     <p className="text-muted-foreground">
-                      {isUploader ? "You" : "Them"} · {doc.file.originalName} ·{" "}
+                      {isUploader ? "You sent" : "They sent"} {doc.file.originalName} on{" "}
                       {formatDate(doc.createdAt)}
                     </p>
                     {isUploader && doc.status === "REJECTED" && doc.reviewNote && (
@@ -64,9 +64,9 @@ export async function ConversationDocuments({
                       </a>
                     )}
                     {isUploader ? (
-                      <Badge variant="outline">{doc.status}</Badge>
+                      <StatusBadge status={doc.status} />
                     ) : (
-                      <Badge>APPROVED</Badge>
+                      <StatusBadge status="APPROVED" />
                     )}
                   </div>
                 </CardContent>

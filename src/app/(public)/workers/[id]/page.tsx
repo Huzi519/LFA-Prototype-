@@ -11,7 +11,7 @@ export default async function PublicWorkerProfilePage({
   const user = await getSessionUser();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10">
       <WorkerProfileDetail
         workerId={id}
         showContactInfo={false}

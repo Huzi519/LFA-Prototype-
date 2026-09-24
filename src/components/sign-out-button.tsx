@@ -8,6 +8,7 @@ export function SignOutButton() {
     <Button
       variant="ghost"
       size="sm"
+      className="text-white/80 hover:bg-white/10 hover:text-white"
       onClick={() => signOut({ redirectTo: "/login" })}
     >
       Log out

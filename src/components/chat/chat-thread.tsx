@@ -111,7 +111,7 @@ export function ChatThread({
         </div>
       )}
 
-      <div className="bg-muted/30 max-h-96 min-h-48 space-y-3 overflow-y-auto rounded-md border p-4">
+      <div className="max-h-[32rem] min-h-64 space-y-3 overflow-y-auto rounded-lg bg-card p-4 ring-1 ring-foreground/10">
         {messages.length === 0 && (
           <p className="text-muted-foreground text-center text-sm">
             No messages yet — say hello.
@@ -137,7 +137,7 @@ export function ChatThread({
           rows={2}
           className="flex-1"
         />
-        <Button onClick={handleSend} disabled={pending || !draft.trim()}>
+        <Button variant="hivis" size="lg" onClick={handleSend} disabled={pending || !draft.trim()}>
           Send
         </Button>
       </div>
@@ -148,23 +148,26 @@ export function ChatThread({
 function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
   if (message.kind === "SYSTEM") {
     return (
-      <p className="text-muted-foreground text-center text-xs">{message.body}</p>
+      <p className="text-muted-foreground mx-auto w-fit rounded-full bg-secondary px-3 py-1 text-center text-xs">{message.body}</p>
     );
   }
 
   if (message.kind === "PROPOSAL") {
     return (
       <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-        <div className="bg-background max-w-sm rounded-lg border-2 border-primary/30 p-3 shadow-sm">
-          <Badge className="mb-1">Proposal</Badge>
-          <p className="font-medium">{message.proposalTitle}</p>
+        <div className="max-w-sm overflow-hidden rounded-lg bg-paper ring-1 ring-bluestone/30">
+          <div className="tape" />
+          <div className="p-3">
+          <Badge className="mb-1.5 bg-bluestone">Proposal</Badge>
+          <p className="font-heading font-bold">{message.proposalTitle}</p>
           <p className="text-muted-foreground text-sm">{message.proposalDescription}</p>
           {message.proposalBudget != null && (
-            <p className="mt-1 font-medium">{formatCents(message.proposalBudget)}</p>
+            <p className="font-heading mt-2 text-xl font-extrabold tracking-tight">{formatCents(message.proposalBudget)}</p>
           )}
           <p className="text-muted-foreground mt-1 text-xs">
             {formatDateTime(new Date(message.createdAt))}
           </p>
+          </div>
         </div>
       </div>
     );
@@ -173,8 +176,10 @@ function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolea
   return (
     <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-sm rounded-lg px-3 py-2 text-sm ${
-          isOwn ? "bg-primary text-primary-foreground" : "bg-background border"
+        className={`max-w-sm px-3.5 py-2.5 text-sm ${
+          isOwn
+            ? "rounded-2xl rounded-br-sm bg-bluestone text-primary-foreground"
+            : "rounded-2xl rounded-bl-sm bg-secondary"
         }`}
       >
         <p className="whitespace-pre-wrap">{message.body}</p>

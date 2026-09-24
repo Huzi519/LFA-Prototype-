@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 import { ReviewForm } from "./review-form";
 
 export default async function AdminDocumentsPage() {
@@ -34,14 +34,14 @@ export default async function AdminDocumentsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Document review</h1>
-        <p className="text-muted-foreground">
+        <h1 className="display-lg text-3xl sm:text-4xl">Document review</h1>
+        <p className="text-muted-foreground mt-1.5 max-w-xl">
           Every document is invisible to its recipient until you approve it.
         </p>
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">
+        <h2 className="display-md mb-3 text-xl">
           Awaiting review ({pending.length})
         </h2>
         {pending.length === 0 ? (
@@ -50,16 +50,16 @@ export default async function AdminDocumentsPage() {
           <div className="space-y-3">
             {pending.map((doc) => (
               <Card key={doc.id}>
-                <CardContent className="flex items-start justify-between gap-4 pt-6 text-sm">
+                <CardContent className="flex flex-wrap items-start justify-between gap-4 text-sm">
                   <div className="space-y-1">
-                    <p className="font-medium">
-                      {doc.category.replace(/_/g, " ")} —{" "}
-                      {doc.conversation.company.companyName} ↔{" "}
-                      {doc.conversation.worker.fullName}
+                    <p className="font-heading text-base font-bold">
+                      {doc.category.charAt(0) + doc.category.slice(1).toLowerCase().replace(/_/g, " ")}
                     </p>
                     <p className="text-muted-foreground">
-                      From {doc.uploader.email} · {doc.file.originalName} ·{" "}
-                      {formatDate(doc.createdAt)}
+                      {doc.conversation.company.companyName} and {doc.conversation.worker.fullName}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {doc.file.originalName}, sent by {doc.uploader.email} on {formatDate(doc.createdAt)}
                     </p>
                     <a
                       href={`/api/files/${doc.file.id}`}
@@ -79,22 +79,23 @@ export default async function AdminDocumentsPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Recently reviewed</h2>
+        <h2 className="display-md mb-3 text-xl">Recently reviewed</h2>
         {recentlyReviewed.length === 0 ? (
           <p className="text-muted-foreground text-sm">Nothing reviewed yet.</p>
         ) : (
           <div className="space-y-2">
             {recentlyReviewed.map((doc) => (
               <Card key={doc.id}>
-                <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
+                <CardContent className="flex items-center justify-between gap-4 text-sm">
                   <span>
-                    {doc.category.replace(/_/g, " ")} —{" "}
-                    {doc.conversation.company.companyName} ↔{" "}
-                    {doc.conversation.worker.fullName} · From {doc.uploader.email}
+                    <span className="font-semibold">
+                      {doc.category.charAt(0) + doc.category.slice(1).toLowerCase().replace(/_/g, " ")}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}between {doc.conversation.company.companyName} and {doc.conversation.worker.fullName}
+                    </span>
                   </span>
-                  <Badge variant={doc.status === "APPROVED" ? "default" : "destructive"}>
-                    {doc.status}
-                  </Badge>
+                  <StatusBadge status={doc.status} />
                 </CardContent>
               </Card>
             ))}

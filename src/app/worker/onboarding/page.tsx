@@ -19,8 +19,8 @@ export default async function WorkerOnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Worker onboarding</h1>
-        <p className="text-muted-foreground">
+        <h1 className="display-lg text-3xl sm:text-4xl">Worker onboarding</h1>
+        <p className="text-muted-foreground mt-1.5 max-w-xl">
           Tell us about yourself and upload your credentials — an admin
           reviews everything before your profile goes live.
         </p>

@@ -3,8 +3,8 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { formatDateTime } from "@/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { ConversationList } from "@/components/lfa/conversation-list";
+import { PageHeader } from "@/components/lfa/page-header";
 
 export default async function CompanyMessagesPage() {
   const user = await requireRole(Role.COMPANY);
@@ -23,47 +23,29 @@ export default async function CompanyMessagesPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Messages</h1>
-        <p className="text-muted-foreground">
-          Your conversations with tradespeople.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader title="Messages" lede="Your conversations with tradespeople." />
 
       {conversations.length === 0 ? (
-        <Card>
-          <CardContent className="text-muted-foreground py-8 text-center text-sm">
-            No conversations yet —{" "}
+        <div className="text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+            No conversations yet,{" "}
             <Link href="/company/workers" className="underline underline-offset-4">
               search for a worker
             </Link>{" "}
             to get started.
-          </CardContent>
-        </Card>
+          </div>
       ) : (
-        <div className="space-y-3">
-          {conversations.map((conv) => (
-            <Link key={conv.id} href={`/company/messages/${conv.id}`} className="block">
-              <Card className="hover:bg-muted/50 transition-colors">
-                <CardHeader className="flex-row items-center justify-between space-y-0">
-                  <CardTitle className="text-base">{conv.worker.fullName}</CardTitle>
-                  {conv.job && <Badge variant="outline">{conv.job.status}</Badge>}
-                </CardHeader>
-                <CardContent className="text-sm">
-                  {conv.messages[0] ? (
-                    <p className="text-muted-foreground truncate">
-                      {conv.messages[0].body} ·{" "}
-                      {formatDateTime(conv.messages[0].createdAt)}
-                    </p>
-                  ) : (
-                    <p className="text-muted-foreground">No messages yet.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <ConversationList
+          rows={conversations.map((conv) => ({
+            id: conv.id,
+            href: `/company/messages/${conv.id}`,
+            name: conv.worker.fullName,
+            subtitle: `${conv.worker.primaryTrade.charAt(0)}${conv.worker.primaryTrade.slice(1).toLowerCase()}, ${conv.worker.homeState}`,
+            jobStatus: conv.job?.status ?? null,
+            lastMessage: conv.messages[0]?.body ?? null,
+            lastAt: conv.messages[0] ? formatDateTime(conv.messages[0].createdAt) : null,
+          }))}
+        />
       )}
     </div>
   );

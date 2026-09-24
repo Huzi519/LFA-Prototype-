@@ -2,34 +2,33 @@
 
 import { useTransition } from "react";
 import { login } from "./actions";
-import { Button } from "@/components/ui/button";
 
-// Development-only quick login for the seeded demo accounts (CLAUDE.md
-// "Seed Data": all demo passwords are Password123!). Just one account per
-// role — the other ~20 worker profiles in the directory are dummy data for
-// browsing, not meant to be logged into (see DECISIONS.md).
+// One-click sign-in for the seeded demo accounts (CLAUDE.md "Seed Data":
+// all demo passwords are Password123!). Shown on every environment because
+// this whole app is a demo; the other ~20 worker profiles in the directory
+// are dummy data for browsing, not meant to be logged into.
 const DEMO_ACCOUNTS = [
-  { label: "Admin", email: "admin@demo.test" },
-  { label: "Company — Builder Co", email: "builder@demo.test" },
-  { label: "Worker — Jack Thompson", email: "worker.live@demo.test" },
+  { role: "Admin", who: "Reviews documents", email: "admin@demo.test" },
+  { role: "Company", who: "Builder Co", email: "builder@demo.test" },
+  { role: "Tradie", who: "Jack Thompson, plumber", email: "worker.live@demo.test" },
 ];
 
 export function DemoLoginHelper() {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="space-y-2">
-      <p className="text-muted-foreground text-center text-xs font-medium uppercase tracking-wide">
-        Demo login (development only)
+    <div className="mt-10 rounded-lg border border-dashed p-4">
+      <p className="text-sm font-semibold">Try a demo account</p>
+      <p className="text-muted-foreground mt-0.5 text-xs">
+        Password for all of them is Password123!
       </p>
-      <div className="grid grid-cols-1 gap-2">
+      <div className="mt-3 grid gap-2">
         {DEMO_ACCOUNTS.map((account) => (
-          <Button
+          <button
             key={account.email}
             type="button"
-            variant="outline"
-            size="sm"
             disabled={pending}
+            className="flex items-center justify-between rounded-md bg-card px-3 py-2 text-left text-sm ring-1 ring-foreground/10 transition-colors hover:ring-hivis disabled:opacity-50 focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
             onClick={() => {
               const formData = new FormData();
               formData.set("email", account.email);
@@ -39,8 +38,12 @@ export function DemoLoginHelper() {
               });
             }}
           >
-            {account.label}
-          </Button>
+            <span>
+              <span className="font-semibold">{account.role}</span>
+              <span className="text-muted-foreground"> {account.who}</span>
+            </span>
+            <span className="text-hivis text-xs font-semibold">Log in</span>
+          </button>
         ))}
       </div>
     </div>

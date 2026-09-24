@@ -12,7 +12,7 @@ export default async function CompanyWorkerProfilePage({
   const { id } = await params;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto w-full max-w-5xl">
       <WorkerProfileDetail
         workerId={id}
         showContactInfo

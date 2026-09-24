@@ -77,6 +77,8 @@ src/
     worker-directory.tsx, worker-profile-detail.tsx  shared by public and company search/profile pages
     conversation-documents.tsx   admin-reviewed document list + upload, scoped to a Conversation
     role-nav.tsx, public-nav.tsx
+    lfa/            design system pieces: worker-card, trade-chip, status-badge, page-header,
+                    wordmark, auth-shell, nav-links, conversation-list, site-footer
   lib/
     db.ts           Prisma client
     auth.ts         session helpers, requireRole()

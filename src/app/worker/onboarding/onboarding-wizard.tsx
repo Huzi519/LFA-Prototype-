@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2 } from "lucide-react";
@@ -164,17 +164,17 @@ export function OnboardingWizard({
         {STEPS.map((label, i) => (
           <div key={label} className="flex flex-1 items-center gap-2">
             <div
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+              className={`font-heading flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                 i === step
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-hivis text-white"
                   : i < step
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
+                    ? "bg-verified text-white"
+                    : "bg-card text-muted-foreground ring-1 ring-foreground/15"
               }`}
             >
               {i + 1}
             </div>
-            <span className="text-muted-foreground hidden text-sm sm:inline">
+            <span className={`hidden text-sm sm:inline ${i === step ? "font-semibold" : "text-muted-foreground"}`}>
               {label}
             </span>
             {i < STEPS.length - 1 && <div className="bg-border h-px flex-1" />}
@@ -419,10 +419,10 @@ function CredentialsStep({
                 {c.issuingState && (
                   <span className="text-muted-foreground"> — {c.issuingState}</span>
                 )}
-                <span className="text-muted-foreground"> · {c.file.originalName}</span>
+                <span className="text-muted-foreground">, {c.file.originalName}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">{c.status}</Badge>
+                <StatusBadge status={c.status} />
                 <Button
                   type="button"
                   variant="ghost"

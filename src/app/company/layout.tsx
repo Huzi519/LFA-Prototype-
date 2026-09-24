@@ -11,7 +11,7 @@ export default async function CompanyLayout({
   if (!user || user.role !== "COMPANY") redirect("/login");
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <RoleNav
         title="Company"
         email={user.email}
@@ -23,7 +23,7 @@ export default async function CompanyLayout({
           { href: "/company/jobs", label: "My jobs" },
         ]}
       />
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>
   );
 }

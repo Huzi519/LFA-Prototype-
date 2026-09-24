@@ -5,8 +5,7 @@ import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { ChatThread } from "@/components/chat/chat-thread";
 import { ConversationDocuments } from "@/components/conversation-documents";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/lfa/status-badge";
 
 export default async function WorkerConversationPage({
   params,
@@ -30,30 +29,33 @@ export default async function WorkerConversationPage({
   if (!conversation || conversation.workerId !== profile.id) notFound();
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>{conversation.company.companyName}</CardTitle>
-          {conversation.job && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{conversation.job.status}</Badge>
-              <Link
-                href={`/worker/jobs/${conversation.job.id}`}
-                className="text-sm underline underline-offset-4"
-              >
-                View job
-              </Link>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            {conversation.job
-              ? "You've been hired for the job above."
-              : "Negotiate the work here — the company will mark you as hired once you agree on the details."}
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header className="flex flex-wrap items-center gap-4 rounded-lg bg-card p-5 ring-1 ring-foreground/10">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-bluestone font-heading text-base font-bold text-primary-foreground">
+          {conversation.company.companyName.split(" ").map((p) => p[0]).slice(0, 2).join("")}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="display-md text-2xl">{conversation.company.companyName}</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground text-sm">
+              {conversation.company.state} {conversation.company.postcode}
+            </span>
+            {conversation.job && <StatusBadge status={conversation.job.status} />}
+          </div>
+        </div>
+        {conversation.job ? (
+          <Link
+            href={`/worker/jobs/${conversation.job.id}`}
+            className="text-sm font-medium underline underline-offset-4"
+          >
+            View job
+          </Link>
+        ) : (
+          <p className="text-muted-foreground w-full text-sm sm:w-auto sm:max-w-56 sm:text-right">
+            The company marks you as hired once you agree on the details.
           </p>
-        </CardContent>
-      </Card>
+        )}
+      </header>
 
       <ChatThread
         conversationId={conversation.id}

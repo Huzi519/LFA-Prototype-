@@ -11,7 +11,7 @@ export default async function WorkerLayout({
   if (!user || user.role !== "WORKER") redirect("/login");
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <RoleNav
         title="Worker"
         email={user.email}
@@ -24,7 +24,7 @@ export default async function WorkerLayout({
           { href: "/worker/documents", label: "Documents" },
         ]}
       />
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
     </div>
   );
 }

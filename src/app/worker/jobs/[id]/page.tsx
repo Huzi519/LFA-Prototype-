@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { formatCents, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 
 export default async function WorkerJobDetailPage({
   params,
@@ -31,12 +31,12 @@ export default async function WorkerJobDetailPage({
           <div>
             <CardTitle className="text-xl">{job.title}</CardTitle>
             <p className="text-muted-foreground text-sm">
-              {job.company.companyName} · {job.trade} · {job.state}{" "}
-              {job.postcode} · Starts {formatDate(job.startDate)} · Budget{" "}
+              {job.company.companyName}, {job.trade}, {job.state}{" "}
+              {job.postcode}, Starts {formatDate(job.startDate)}, Budget{" "}
               {formatCents(job.budget)}
             </p>
           </div>
-          <Badge variant="outline">{job.status}</Badge>
+          <StatusBadge status={job.status} />
         </CardHeader>
         <CardContent>
           <p className="whitespace-pre-wrap text-sm">{job.description}</p>

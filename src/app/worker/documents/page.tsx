@@ -23,8 +23,8 @@ export default async function WorkerDocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Documents</h1>
-        <p className="text-muted-foreground">
+        <h1 className="display-lg text-3xl sm:text-4xl">Documents</h1>
+        <p className="text-muted-foreground mt-1.5 max-w-xl">
           Every document you&apos;ve shared or received, across all your
           conversations.
         </p>
@@ -47,16 +47,16 @@ export default async function WorkerDocumentsPage() {
                 href={`/worker/messages/${doc.conversationId}`}
                 className="block"
               >
-                <Card className="hover:bg-muted/50 transition-colors">
+                <Card className="transition-shadow hover:shadow-[0_10px_30px_-12px_rgba(21,34,56,0.35)]">
                   <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
                     <div>
                       <p className="font-medium">
-                        {doc.category.replace(/_/g, " ")} —{" "}
+                        {doc.category.replace(/_/g, " ")},{" "}
                         {doc.conversation.company.companyName}
                       </p>
-                      <p className="text-muted-foreground">
-                        {isUploader ? "You uploaded" : "They uploaded"} ·{" "}
-                        {doc.file.originalName} · {formatDate(doc.createdAt)}
+                      <p className="text-muted-foreground mt-1.5 max-w-xl">
+                        {isUploader ? "You uploaded" : "They uploaded"}{" "}
+                        {doc.file.originalName}, {formatDate(doc.createdAt)}
                       </p>
                     </div>
                     <Badge variant="outline">{isUploader ? doc.status : "APPROVED"}</Badge>

@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { formatCents, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 
 export default async function CompanyJobDetailPage({
   params,
@@ -31,11 +31,11 @@ export default async function CompanyJobDetailPage({
           <div>
             <CardTitle className="text-xl">{job.title}</CardTitle>
             <p className="text-muted-foreground text-sm">
-              {job.trade} · {job.state} {job.postcode} · Starts{" "}
-              {formatDate(job.startDate)} · Budget {formatCents(job.budget)}
+              {job.trade}, {job.state} {job.postcode}, Starts{" "}
+              {formatDate(job.startDate)}, Budget {formatCents(job.budget)}
             </p>
           </div>
-          <Badge variant="outline">{job.status}</Badge>
+          <StatusBadge status={job.status} />
         </CardHeader>
         <CardContent>
           <p className="whitespace-pre-wrap text-sm">{job.description}</p>
@@ -49,8 +49,8 @@ export default async function CompanyJobDetailPage({
         <CardContent className="flex items-center justify-between text-sm">
           <div>
             <p className="font-medium">{job.worker.fullName}</p>
-            <p className="text-muted-foreground">
-              {job.worker.primaryTrade} · {job.worker.homeState}
+            <p className="text-muted-foreground mt-1.5 max-w-xl">
+              {job.worker.primaryTrade}, {job.worker.homeState}
             </p>
           </div>
           {job.conversation && (

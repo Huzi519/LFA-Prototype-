@@ -19,6 +19,8 @@ export function PublicContactSlot({
   if (!isCompany) {
     return (
       <Button
+        variant="hivis"
+        size="lg"
         nativeButton={false}
         render={<Link href="/register?tab=company" />}
       >
@@ -29,6 +31,8 @@ export function PublicContactSlot({
 
   return (
     <Button
+      variant="hivis"
+      size="lg"
       disabled={pending}
       onClick={() =>
         startTransition(async () => {

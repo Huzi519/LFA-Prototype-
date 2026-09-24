@@ -44,12 +44,12 @@ export function NotificationBell({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="relative inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+        className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-white/80 hover:bg-white/10 hover:text-white"
         aria-label="Notifications"
       >
         <Bell className="size-4" />
         {unreadCount > 0 && (
-          <span className="bg-destructive text-destructive-foreground absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium">
+          <span className="bg-hivis absolute text-white -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}

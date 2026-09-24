@@ -2,9 +2,10 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/lfa/page-header";
+import { StatusBadge } from "@/components/lfa/status-badge";
+import { TradeChip } from "@/components/lfa/trade-chip";
 import { formatCents, formatDate } from "@/lib/format";
 
 export default async function CompanyDashboardPage() {
@@ -13,77 +14,87 @@ export default async function CompanyDashboardPage() {
     where: { userId: user.id },
   });
 
-  const recentJobs = profile
-    ? await db.job.findMany({
-        where: { companyId: profile.id },
-        include: { worker: true },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      })
-    : [];
+  const [recentJobs, openConversations, liveWorkers] = await Promise.all([
+    profile
+      ? db.job.findMany({
+          where: { companyId: profile.id },
+          include: { worker: true },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+      : [],
+    profile ? db.conversation.count({ where: { companyId: profile.id, jobId: null } }) : 0,
+    db.workerProfile.count({ where: { profileStatus: "LIVE" } }),
+  ]);
+
+  const stats = [
+    { label: "Tradies available", value: liveWorkers, href: "/company/workers" },
+    { label: "Open conversations", value: openConversations, href: "/company/messages" },
+    { label: "Hired", value: recentJobs.length, href: "/company/jobs" },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {profile?.companyName ?? "Company"} dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            Search for tradespeople, message them and hire directly.
-          </p>
-        </div>
-        <Button nativeButton={false} render={<Link href="/company/workers" />}>
-          Search workers
-        </Button>
+    <div className="space-y-8">
+      <PageHeader
+        title={profile?.companyName ?? "Company"}
+        lede={
+          profile?.verified
+            ? "Verified company. Search, message and hire directly."
+            : "Search, message and hire directly. Verification is pending."
+        }
+        action={
+          <Button variant="hivis" size="lg" nativeButton={false} render={<Link href="/company/workers" />}>
+            Find a tradie
+          </Button>
+        }
+      />
+
+      <div className="grid gap-px overflow-hidden rounded-lg bg-border ring-1 ring-foreground/10 sm:grid-cols-3">
+        {stats.map((s) => (
+          <Link key={s.label} href={s.href} className="bg-card p-5 transition-colors hover:bg-secondary">
+            <p className="font-heading text-4xl font-extrabold tracking-tight">{s.value}</p>
+            <p className="text-muted-foreground mt-1 text-sm">{s.label}</p>
+          </Link>
+        ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Organisation</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p>
-            Verified:{" "}
-            <Badge variant={profile?.verified ? "default" : "outline"}>
-              {profile?.verified ? "Yes" : "Not yet"}
-            </Badge>
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Recent jobs</CardTitle>
-          <Link href="/company/jobs" className="text-sm underline underline-offset-4">
-            View all
+      <section>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="display-md text-xl">Recent hires</h2>
+          <Link href="/company/jobs" className="text-sm font-medium underline underline-offset-4">
+            View all jobs
           </Link>
-        </CardHeader>
-        <CardContent>
-          {recentJobs.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              You haven&apos;t hired anyone yet.
+        </div>
+        {recentJobs.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-8 text-center">
+            <p className="font-semibold">No one hired yet.</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Open a conversation with a tradie and mark them as hired once you agree on the details.
             </p>
-          ) : (
-            <ul className="space-y-2">
-              {recentJobs.map((job) => (
-                <li key={job.id}>
-                  <Link
-                    href={`/company/jobs/${job.id}`}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted/50"
-                  >
-                    <span>
-                      {job.title} · {job.worker.fullName} · Starts{" "}
-                      {formatDate(job.startDate)} · {formatCents(job.budget)}
+          </div>
+        ) : (
+          <ul className="divide-y overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10">
+            {recentJobs.map((job) => (
+              <li key={job.id}>
+                <Link
+                  href={`/company/jobs/${job.id}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm transition-colors hover:bg-secondary"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{job.title}</span>
+                    <span className="text-muted-foreground">
+                      {job.worker.fullName}, starts {formatDate(job.startDate)}
                     </span>
-                    <Badge variant="outline">{job.status}</Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  </span>
+                  <span className="w-24"><TradeChip trade={job.trade} /></span>
+                  <span className="font-heading w-24 text-right font-bold">{formatCents(job.budget)}</span>
+                  <span className="w-24 text-right"><StatusBadge status={job.status} /></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

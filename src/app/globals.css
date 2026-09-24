@@ -7,9 +7,16 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --color-paper: var(--paper);
+  --color-bluestone: var(--bluestone);
+  --color-bluestone-deep: var(--bluestone-deep);
+  --color-hivis: var(--hivis);
+  --color-hivis-foreground: var(--hivis-foreground);
+  --color-verified: var(--verified);
+  --color-steel: var(--steel);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,38 +56,47 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* LFA palette: concrete paper, bluestone, one hi-vis accent. */
+  --paper: #f4f3ee;
+  --bluestone: #152238;
+  --bluestone-deep: #0d1728;
+  --hivis: #ff5c1a;
+  --hivis-foreground: #1a0d05;
+  --verified: #1b7f4e;
+  --steel: #5b6472;
+
+  --background: var(--paper);
+  --foreground: #152238;
+  --card: #ffffff;
+  --card-foreground: #152238;
+  --popover: #ffffff;
+  --popover-foreground: #152238;
+  --primary: #152238;
+  --primary-foreground: #f8f7f3;
+  --secondary: #e9e8e1;
+  --secondary-foreground: #152238;
+  --muted: #ebeae4;
+  --muted-foreground: #5b6472;
+  --accent: #ffe3d6;
+  --accent-foreground: #7a2600;
+  --destructive: #c8321f;
+  --border: #d9d8d0;
+  --input: #cfceC6;
+  --ring: #ff5c1a;
+  --chart-1: #152238;
+  --chart-2: #ff5c1a;
+  --chart-3: #1b7f4e;
+  --chart-4: #c98a00;
+  --chart-5: #5b6472;
+  --radius: 0.5rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #152238;
+  --sidebar-primary: #152238;
+  --sidebar-primary-foreground: #f8f7f3;
+  --sidebar-accent: #ebeae4;
+  --sidebar-accent-foreground: #152238;
+  --sidebar-border: #d9d8d0;
+  --sidebar-ring: #ff5c1a;
 }
 
 .dark {
@@ -123,8 +139,83 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
   }
   html {
     @apply font-sans;
   }
+  h1, h2, h3 {
+    @apply font-heading tracking-tight;
+    text-wrap: balance;
+  }
+  ::selection {
+    background: var(--hivis);
+    color: #fff;
+  }
+}
+
+/* Display type: heavy, tight, slightly condensed. */
+@utility display-xl {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  font-variation-settings: "wdth" 90, "opsz" 96;
+}
+@utility display-lg {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variation-settings: "wdth" 92, "opsz" 48;
+}
+@utility display-md {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variation-settings: "wdth" 96, "opsz" 24;
+}
+
+/* Trade chips: colour encodes the trade so the directory reads at a glance. */
+@utility trade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.5rem;
+  padding: 0 0.6rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--chip-fg, var(--foreground));
+  background: var(--chip-bg, var(--muted));
+}
+[data-trade="PLUMBER"] { --chip-bg: #dce7fb; --chip-fg: #12459d; }
+[data-trade="ELECTRICIAN"] { --chip-bg: #fbecc2; --chip-fg: #7a5200; }
+[data-trade="CARPENTER"] { --chip-bg: #efdfcf; --chip-fg: #6b3f16; }
+[data-trade="LABOURER"] { --chip-bg: #d8efe1; --chip-fg: #145c39; }
+
+/* Hi-vis tape: a hairline of diagonal safety stripes. */
+@utility tape {
+  height: 6px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--hivis) 0 12px,
+    var(--bluestone) 12px 24px
+  );
+}
+
+/* Hero card deck settle-in. */
+@keyframes deck-settle {
+  from { opacity: 0; transform: translateY(18px) rotate(var(--r, 0deg)); }
+  to { opacity: 1; transform: translateY(0) rotate(var(--r, 0deg)); }
+}
+.deck-card {
+  transform: rotate(var(--r, 0deg));
+  animation: deck-settle 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .deck-card { animation: none; }
 }

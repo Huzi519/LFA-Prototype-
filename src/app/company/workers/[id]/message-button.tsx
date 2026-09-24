@@ -11,6 +11,8 @@ export function MessageButton({ workerId }: { workerId: string }) {
 
   return (
     <Button
+      variant="hivis"
+      size="lg"
       disabled={pending}
       onClick={() =>
         startTransition(async () => {

@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Role } from "@/generated/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/lfa/status-badge";
 import { formatCents, formatDate } from "@/lib/format";
 
 export default async function WorkerJobsPage() {
@@ -21,8 +21,8 @@ export default async function WorkerJobsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Your jobs</h1>
-        <p className="text-muted-foreground">
+        <h1 className="display-lg text-3xl sm:text-4xl">Your jobs</h1>
+        <p className="text-muted-foreground mt-1.5 max-w-xl">
           {jobs.length} job{jobs.length === 1 ? "" : "s"} you&apos;ve been hired for.
         </p>
       </div>
@@ -42,16 +42,16 @@ export default async function WorkerJobsPage() {
         <div className="space-y-3">
           {jobs.map((job) => (
             <Link key={job.id} href={`/worker/jobs/${job.id}`} className="block">
-              <Card className="hover:bg-muted/50 transition-colors">
+              <Card className="transition-shadow hover:shadow-[0_10px_30px_-12px_rgba(21,34,56,0.35)]">
                 <CardHeader className="flex-row items-center justify-between space-y-0">
                   <div>
                     <CardTitle className="text-base">{job.title}</CardTitle>
                     <p className="text-muted-foreground text-sm">
-                      {job.company.companyName} · {job.trade} · {job.state}{" "}
-                      {job.postcode} · Starts {formatDate(job.startDate)}
+                      {job.company.companyName}, {job.trade}, {job.state}{" "}
+                      {job.postcode}, Starts {formatDate(job.startDate)}
                     </p>
                   </div>
-                  <Badge variant="outline">{job.status}</Badge>
+                  <StatusBadge status={job.status} />
                 </CardHeader>
                 <CardContent className="text-sm">
                   <span>{formatCents(job.budget)}</span>

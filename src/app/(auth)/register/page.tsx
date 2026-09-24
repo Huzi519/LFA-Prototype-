@@ -7,13 +7,7 @@ import { registerWorker, registerCompany } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { AuthShell } from "@/components/lfa/auth-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -41,17 +35,14 @@ function RegisterForm() {
   );
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create your LFA account</CardTitle>
-          <CardDescription>
-            Tradespeople and companies register separately.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthShell statement="Join the crew.">
+      <h2 className="display-lg text-3xl">Create your account</h2>
+      <p className="text-muted-foreground mt-2 text-sm">
+        Tradies and companies register separately.
+      </p>
+      <div className="mt-8">
           <Tabs defaultValue={defaultTab}>
-            <TabsList className="w-full">
+            <TabsList className="h-10 w-full">
               <TabsTrigger value="worker" className="flex-1">
                 Tradesperson
               </TabsTrigger>
@@ -85,7 +76,7 @@ function RegisterForm() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={workerPending}>
+                <Button type="submit" size="lg" className="h-10 w-full" disabled={workerPending}>
                   {workerPending ? "Creating account…" : "Continue to onboarding"}
                 </Button>
               </form>
@@ -121,7 +112,7 @@ function RegisterForm() {
                       id="state"
                       name="state"
                       required
-                      className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs"
+                      className="border-input flex h-10 w-full rounded-md border bg-card px-3 py-1 text-sm"
                     >
                       {STATES.map((s) => (
                         <option key={s} value={s}>
@@ -149,21 +140,20 @@ function RegisterForm() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={companyPending}>
+                <Button type="submit" size="lg" className="h-10 w-full" disabled={companyPending}>
                   {companyPending ? "Creating account…" : "Create account"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
 
-          <p className="text-muted-foreground mt-6 text-center text-sm">
+          <p className="text-muted-foreground mt-6 text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="underline underline-offset-4">
+            <Link href="/login" className="text-foreground font-medium underline underline-offset-4">
               Log in
             </Link>
           </p>
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </AuthShell>
   );
 }
