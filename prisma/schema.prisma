@@ -1,0 +1,333 @@
+// LFA (Labour Workforce Australia) — prototype schema
+// See CLAUDE.md "Data Model (core entities)" for the source of truth.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  WORKER
+  COMPANY
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ProfileStatus {
+  DRAFT
+  PENDING_REVIEW
+  LIVE
+  HIDDEN
+}
+
+enum AustralianState {
+  NSW
+  VIC
+  QLD
+  WA
+  SA
+  TAS
+  ACT
+  NT
+}
+
+enum Trade {
+  PLUMBER
+  ELECTRICIAN
+  CARPENTER
+  LABOURER
+}
+
+enum CredentialType {
+  TRADE_LICENCE
+  WHITE_CARD
+  PUBLIC_LIABILITY
+  WORKERS_COMP
+  POLICE_CHECK
+  WWCC
+  OTHER
+}
+
+enum CredentialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum JobStatus {
+  OPEN
+  HIRED
+  IN_PROGRESS
+  PROOF_SUBMITTED
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum DocumentCategory {
+  CONTRACT
+  DRAWING
+  SCOPE
+  SWMS
+  INDUCTION
+  PROOF_OF_COMPLETION
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum EscrowStatus {
+  AWAITING_FUNDING
+  FUNDED
+  IN_PROGRESS
+  PROOF_SUBMITTED
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED_RELEASE
+  RESOLVED_REFUND
+}
+
+// ---------- Core ----------
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+
+  workerProfile  WorkerProfile?
+  companyProfile CompanyProfile?
+
+  files             File[]
+  notifications     Notification[]
+  uploadedDocuments Document[]      @relation("DocumentUploader")
+  receivedDocuments Document[]      @relation("DocumentRecipient")
+  disputesRaised    Dispute[]       @relation("DisputeRaisedBy")
+  reviewedCredentials Credential[]  @relation("CredentialReviewer")
+  escrowEvents      EscrowEvent[]
+}
+
+model WorkerProfile {
+  id               String          @id @default(cuid())
+  userId           String          @unique
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName         String
+  phone            String
+  abn              String
+  primaryTrade     Trade
+  otherTrades      String // JSON-encoded string[] (SQLite has no native array type)
+  yearsExperience  Int
+  bio              String
+  hourlyRate       Int // cents
+  homeState        AustralianState
+  serviceRadiusKm  Int
+  postcode         String
+  profileStatus    ProfileStatus   @default(DRAFT)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  credentials Credential[]
+  quotes      Quote[]
+  hiredJobs   Job[]        @relation("HiredWorker")
+}
+
+model CompanyProfile {
+  id          String          @id @default(cuid())
+  userId      String          @unique
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String
+  abn         String
+  contactName String
+  phone       String
+  state       AustralianState
+  postcode    String
+  verified    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+
+  jobs Job[]
+}
+
+model Credential {
+  id             String           @id @default(cuid())
+  workerId       String
+  worker         WorkerProfile    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  type           CredentialType
+  trade          Trade?
+  licenceNumber  String?
+  issuingState   AustralianState?
+  issuer         String?
+  expiryDate     DateTime?
+  fileId         String
+  file           File             @relation(fields: [fileId], references: [id])
+  status         CredentialStatus @default(PENDING)
+  reviewedBy     String?
+  reviewer       User?            @relation("CredentialReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt     DateTime?
+  rejectionReason String?
+  createdAt      DateTime         @default(now())
+
+  @@index([workerId])
+}
+
+model Job {
+  id            String    @id @default(cuid())
+  companyId     String
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title         String
+  description   String
+  trade         Trade
+  state         AustralianState
+  postcode      String
+  startDate     DateTime
+  budget        Int // cents
+  status        JobStatus @default(OPEN)
+  hiredWorkerId String?
+  hiredWorker   WorkerProfile? @relation("HiredWorker", fields: [hiredWorkerId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  quotes    Quote[]
+  documents Document[]
+  escrow    EscrowTransaction?
+  disputes  Dispute[]
+
+  @@index([companyId])
+  @@index([trade, state])
+}
+
+model Quote {
+  id        String      @id @default(cuid())
+  jobId     String
+  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerId  String
+  worker    WorkerProfile @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  amount    Int // cents
+  message   String
+  status    QuoteStatus @default(SUBMITTED)
+  createdAt DateTime    @default(now())
+
+  @@index([jobId])
+  @@index([workerId])
+}
+
+model Document {
+  id          String           @id @default(cuid())
+  jobId       String
+  job         Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  uploaderId  String
+  uploader    User             @relation("DocumentUploader", fields: [uploaderId], references: [id])
+  recipientId String
+  recipient   User             @relation("DocumentRecipient", fields: [recipientId], references: [id])
+  category    DocumentCategory
+  fileId      String
+  file        File             @relation(fields: [fileId], references: [id])
+  status      DocumentStatus   @default(PENDING_REVIEW)
+  reviewNote  String?
+  createdAt   DateTime         @default(now())
+
+  @@index([jobId])
+  @@index([recipientId])
+}
+
+model EscrowTransaction {
+  id            String       @id @default(cuid())
+  jobId         String       @unique
+  job           Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  amount        Int // cents, total funded by company
+  platformFee   Int // cents
+  workerPayout  Int // cents
+  status        EscrowStatus @default(AWAITING_FUNDING)
+  providerRef   String?
+  fundedAt      DateTime?
+  startedAt     DateTime?
+  proofSubmittedAt DateTime?
+  releasedAt    DateTime?
+  refundedAt    DateTime?
+  createdAt     DateTime     @default(now())
+
+  events EscrowEvent[]
+}
+
+model EscrowEvent {
+  id         String            @id @default(cuid())
+  escrowId   String
+  escrow     EscrowTransaction @relation(fields: [escrowId], references: [id], onDelete: Cascade)
+  fromStatus EscrowStatus
+  toStatus   EscrowStatus
+  actorId    String
+  actor      User              @relation(fields: [actorId], references: [id])
+  note       String?
+  createdAt  DateTime          @default(now())
+
+  @@index([escrowId])
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  jobId          String
+  job            Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  raisedBy       String
+  raisedByUser   User          @relation("DisputeRaisedBy", fields: [raisedBy], references: [id])
+  reason         String
+  status         DisputeStatus @default(OPEN)
+  resolutionNote String?
+  createdAt      DateTime      @default(now())
+
+  @@index([jobId])
+}
+
+model File {
+  id           String   @id @default(cuid())
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id])
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  createdAt    DateTime @default(now())
+
+  credentials Credential[]
+  documents   Document[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

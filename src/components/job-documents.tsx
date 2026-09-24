@@ -1,0 +1,83 @@
+import { db } from "@/lib/db";
+import { formatDate } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { DocumentUploadForm } from "@/components/document-upload-form";
+
+/**
+ * Documents for a job, from the current viewer's perspective. Per CLAUDE.md
+ * "Documents": the uploader always sees their own documents and status
+ * (rejected ones with the admin's note); the recipient only ever sees
+ * APPROVED documents.
+ */
+export async function JobDocuments({
+  jobId,
+  viewerUserId,
+  canUpload,
+}: {
+  jobId: string;
+  viewerUserId: string;
+  canUpload: boolean;
+}) {
+  const documents = await db.document.findMany({
+    where: {
+      jobId,
+      OR: [{ uploaderId: viewerUserId }, { recipientId: viewerUserId, status: "APPROVED" }],
+    },
+    include: { file: true, uploader: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">Documents</h2>
+
+      {documents.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No documents shared yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {documents.map((doc) => {
+            const isUploader = doc.uploaderId === viewerUserId;
+            return (
+              <Card key={doc.id}>
+                <CardContent className="flex items-center justify-between gap-4 pt-6 text-sm">
+                  <div>
+                    <p className="font-medium">{doc.category.replace(/_/g, " ")}</p>
+                    <p className="text-muted-foreground">
+                      {isUploader ? "You" : "Them"} · {doc.file.originalName} ·{" "}
+                      {formatDate(doc.createdAt)}
+                    </p>
+                    {isUploader && doc.status === "REJECTED" && doc.reviewNote && (
+                      <p className="text-destructive mt-1">
+                        Rejected: {doc.reviewNote}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {(doc.status === "APPROVED" || isUploader) && (
+                      <a
+                        href={`/api/files/${doc.file.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm underline underline-offset-4"
+                      >
+                        View
+                      </a>
+                    )}
+                    {isUploader ? (
+                      <Badge variant="outline">{doc.status}</Badge>
+                    ) : (
+                      <Badge>APPROVED</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {canUpload && <DocumentUploadForm jobId={jobId} />}
+    </div>
+  );
+}
