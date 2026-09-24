@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { WorkerCard } from "@/components/lfa/worker-card";
 import { TradeChip } from "@/components/lfa/trade-chip";
 
+// Live counts and the worker deck come from the database, so render on
+// request rather than at build time (the build container has no database).
+export const dynamic = "force-dynamic";
+
 const TRADES = ["PLUMBER", "ELECTRICIAN", "CARPENTER", "LABOURER"] as const;
 const STATES = ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"] as const;
 
